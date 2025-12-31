@@ -168,6 +168,60 @@ export default function Dashboard() {
         }
     };
 
+    const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+    const [analysisResult, setAnalysisResult] = useState<{
+        companyName?: string;
+        tagline?: string;
+        pricing?: {
+            plans?: Array<{ name: string; price: string; period?: string; credits?: string; features?: string[] }>;
+            promotions?: string[];
+        };
+        features?: {
+            highlighted?: string[];
+            differentiators?: string[];
+        };
+        positioning?: {
+            targetAudience?: string;
+            valueProposition?: string;
+            socialProof?: string[];
+        };
+        insights?: string[];
+        summary?: string;
+    } | null>(null);
+
+    const handleAnalyze = async (competitorId: string) => {
+        setAnalyzingId(competitorId);
+        setAnalysisResult(null);
+
+        try {
+            const res = await fetch("/api/analyze-competitor", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ competitorId }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                alert(data.error || "Analysis failed");
+                return;
+            }
+
+            setAnalysisResult(data.analysis);
+
+            const competitor = competitors.find((c) => c.id === competitorId);
+            const changeMsg = data.hasChanged
+                ? "🔴 Changes detected!"
+                : "✓ No changes since last analysis";
+            setCheckSuccess(`${changeMsg} ${competitor?.name || "Page"} analyzed.`);
+            setTimeout(() => setCheckSuccess(null), 5000);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Analysis failed");
+        } finally {
+            setAnalyzingId(null);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex-1 flex flex-col min-h-screen">
@@ -211,6 +265,136 @@ export default function Dashboard() {
                     <div className="bg-emerald-500/90 text-white px-4 py-3 rounded-lg shadow-lg text-sm">
                         {checkSuccess}
                     </div>
+                </div>
+            )}
+
+            {/* Analysis Results Modal */}
+            {analysisResult && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <Card className="glass-card max-w-2xl w-full max-h-[80vh] overflow-auto">
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle className="flex items-center gap-2">
+                                <span>🔍</span>
+                                AI Analysis: {analysisResult.companyName}
+                            </CardTitle>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setAnalysisResult(null)}
+                            >
+                                ✕
+                            </Button>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* Executive Summary */}
+                            {analysisResult.summary && (
+                                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
+                                    <p className="text-sm text-foreground">{analysisResult.summary}</p>
+                                </div>
+                            )}
+
+                            {/* Tagline */}
+                            {analysisResult.tagline && (
+                                <p className="text-muted-foreground italic">"{analysisResult.tagline}"</p>
+                            )}
+
+                            {/* Pricing Plans */}
+                            {analysisResult.pricing?.plans && analysisResult.pricing.plans.length > 0 && (
+                                <div>
+                                    <h3 className="font-semibold mb-3 text-foreground">💰 Pricing Plans</h3>
+                                    <div className="grid gap-3">
+                                        {analysisResult.pricing.plans.map((plan: { name: string; price: string; period?: string; credits?: string; features?: string[] }, i: number) => (
+                                            <div key={i} className="border border-border/50 rounded-lg p-3 bg-surface-elevated/50">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="font-medium text-foreground">{plan.name}</span>
+                                                    <span className="text-emerald-400 font-bold">{plan.price}{plan.period ? `/${plan.period}` : ""}</span>
+                                                </div>
+                                                {plan.credits && (
+                                                    <p className="text-sm text-muted-foreground">{plan.credits}</p>
+                                                )}
+                                                {plan.features && plan.features.length > 0 && (
+                                                    <ul className="text-xs text-muted-foreground mt-2 space-y-1">
+                                                        {plan.features.slice(0, 4).map((f: string, j: number) => (
+                                                            <li key={j}>• {f}</li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {analysisResult.pricing.promotions && analysisResult.pricing.promotions.length > 0 && (
+                                        <div className="mt-3 text-sm text-amber-400">
+                                            🎁 {analysisResult.pricing.promotions.join(" • ")}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Features */}
+                            {analysisResult.features?.highlighted && analysisResult.features.highlighted.length > 0 && (
+                                <div>
+                                    <h3 className="font-semibold mb-3 text-foreground">✨ Key Features</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {analysisResult.features.highlighted.map((f: string, i: number) => (
+                                            <span key={i} className="px-2 py-1 bg-surface-elevated text-xs rounded-full text-muted-foreground">
+                                                {f}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    {analysisResult.features.differentiators && analysisResult.features.differentiators.length > 0 && (
+                                        <div className="mt-3">
+                                            <p className="text-xs text-muted-foreground mb-1">Differentiators:</p>
+                                            <ul className="text-sm text-foreground space-y-1">
+                                                {analysisResult.features.differentiators.map((d: string, i: number) => (
+                                                    <li key={i}>→ {d}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Target Audience */}
+                            {analysisResult.positioning?.targetAudience && (
+                                <div>
+                                    <h3 className="font-semibold mb-2 text-foreground">🎯 Target Audience</h3>
+                                    <p className="text-sm text-muted-foreground">{analysisResult.positioning.targetAudience}</p>
+                                    {analysisResult.positioning.valueProposition && (
+                                        <p className="text-sm text-emerald-400 mt-2">"{analysisResult.positioning.valueProposition}"</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Social Proof */}
+                            {analysisResult.positioning?.socialProof && analysisResult.positioning.socialProof.length > 0 && (
+                                <div>
+                                    <h3 className="font-semibold mb-2 text-foreground">🏆 Social Proof</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {analysisResult.positioning.socialProof.map((s: string, i: number) => (
+                                            <span key={i} className="px-2 py-1 bg-amber-500/10 text-xs rounded-full text-amber-400">
+                                                {s}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Key Insights */}
+                            {analysisResult.insights && analysisResult.insights.length > 0 && (
+                                <div>
+                                    <h3 className="font-semibold mb-3 text-foreground">💡 Key Insights</h3>
+                                    <ul className="space-y-2">
+                                        {analysisResult.insights.map((insight: string, i: number) => (
+                                            <li key={i} className="flex gap-2 text-sm text-muted-foreground">
+                                                <span className="text-emerald-400 shrink-0">→</span>
+                                                {insight}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
             )}
 
@@ -376,6 +560,25 @@ export default function Dashboard() {
                                                             <>
                                                                 <RefreshCw className="w-3 h-3 mr-1" />
                                                                 Check Now
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="flex-1 text-xs bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20"
+                                                        onClick={() => handleAnalyze(competitor.id)}
+                                                        disabled={analyzingId === competitor.id}
+                                                    >
+                                                        {analyzingId === competitor.id ? (
+                                                            <>
+                                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                                Analyzing...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="mr-1">🔍</span>
+                                                                Analyze
                                                             </>
                                                         )}
                                                     </Button>
