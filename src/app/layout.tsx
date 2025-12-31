@@ -1,24 +1,38 @@
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Instrument_Serif, Space_Mono, Inter } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
 
-const inter = Inter({
+const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
-  variable: "--font-inter",
+  weight: "400",
+  variable: "--font-display",
   display: "swap",
 });
 
-const outfit = Outfit({
+const spaceMono = Space_Mono({
   subsets: ["latin"],
-  variable: "--font-outfit",
+  weight: ["400", "700"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Dodo Payments Next.js Boilerplate",
-  description: "Minimal boilerplate for Dodo Payments with Next.js App Router",
+  title: "RivalEye — Competitive Intelligence That Thinks",
+  description:
+    "Monitor competitor pricing pages. Get AI-powered insights when something changes. Know what matters before it's too late.",
+  keywords: ["competitive intelligence", "competitor monitoring", "pricing alerts", "SaaS tools"],
+  openGraph: {
+    title: "RivalEye — Competitive Intelligence That Thinks",
+    description: "Monitor competitor pricing. Get AI insights. Act faster.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -27,13 +41,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
-      <body className="bg-black text-white selection:bg-white selection:text-black antialiased min-h-screen flex flex-col">
-        <Header />
-        <main className="grow pt-16">
-          {children}
-        </main>
-        <Footer />
+    <html
+      lang="en"
+      className={`dark ${instrumentSerif.variable} ${spaceMono.variable} ${inter.variable}`}
+    >
+      <body className="bg-background text-foreground antialiased min-h-screen flex flex-col noise-overlay">
+        {children}
+        <Toaster position="bottom-right" />
       </body>
     </html>
   );
