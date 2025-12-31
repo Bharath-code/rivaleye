@@ -1,20 +1,12 @@
-import OpenAI from "openai";
+import { generateText, isAIAvailable } from "./aiProvider";
 import type { AIInsight, DiffResult, MeaningfulnessResult } from "@/lib/types";
 
 /**
  * AI Insight Generator
- * 
- * Uses OpenAI to generate business-relevant insights from detected changes.
+ *
+ * Uses Gemini/OpenRouter to generate business-relevant insights from detected changes.
  * Constrained prompt to prevent hallucination and over-claiming.
  */
-
-function getOpenAIClient(): OpenAI {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-        throw new Error("Missing OPENAI_API_KEY environment variable");
-    }
-    return new OpenAI({ apiKey });
-}
 
 const SYSTEM_PROMPT = `You are a competitive intelligence analyst for SaaS companies. Your job is to interpret changes detected on competitor websites and provide actionable insights.
 
@@ -50,9 +42,18 @@ export async function generateInsight(
         return NO_SIGNAL_RESPONSE;
     }
 
-    try {
-        const client = getOpenAIClient();
+    // Check if AI is available
+    if (!isAIAvailable()) {
+        console.warn("[AI] No AI provider available, returning fallback response");
+        return {
+            whatChanged: meaningfulness.reason,
+            whyItMatters: `A ${meaningfulness.signalType || "notable"} change was detected. Review the details to understand the competitive implications.`,
+            whatToDo: "Review the change details and assess if this affects your positioning or pricing strategy.",
+            confidence: "low",
+        };
+    }
 
+    try {
         // Build the user prompt with the diff context
         const changesDescription = diff.changedBlocks
             .slice(0, 5) // Limit to 5 blocks to control token usage
@@ -76,20 +77,17 @@ ${changesDescription}
 
 Analyze these changes and provide your insight following the exact format specified.`;
 
-        const response = await client.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-                { role: "system", content: SYSTEM_PROMPT },
-                { role: "user", content: userPrompt },
-            ],
-            temperature: 0.3, // Low temperature for consistent, factual outputs
-            max_tokens: 500,
+        const result = await generateText({
+            systemPrompt: SYSTEM_PROMPT,
+            userPrompt,
+            maxTokens: 500,
+            temperature: 0.3,
         });
 
-        const content = response.choices[0]?.message?.content || "";
+        console.log(`[AI] Insight generated via ${result.provider}/${result.model}`);
 
         // Parse the response
-        const insight = parseInsightResponse(content, meaningfulness);
+        const insight = parseInsightResponse(result.content, meaningfulness);
 
         return insight;
     } catch (error) {
@@ -133,3 +131,4 @@ function parseInsightResponse(
         confidence,
     };
 }
+

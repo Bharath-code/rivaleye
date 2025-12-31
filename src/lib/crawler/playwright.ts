@@ -38,6 +38,9 @@ function extractContent(page: Page): Promise<{ markdown: string; rawText: string
             "[class*='banner']",
             "[class*='popup']",
             "[id*='cookie']",
+            "[aria-hidden='true']",
+            ".sr-only",
+            ".visually-hidden",
         ];
 
         removeSelectors.forEach((sel) => {
@@ -45,19 +48,82 @@ function extractContent(page: Page): Promise<{ markdown: string; rawText: string
         });
 
         const lines: string[] = [];
+        const seen = new Set<string>();
+
+        // Detect ASCII art patterns
+        const isAsciiArt = (text: string): boolean => {
+            // ASCII art typically has:
+            // 1. High ratio of special characters
+            // 2. Patterns of repeated symbols
+            // 3. Very few actual words
+
+            const specialChars = text.match(/[':;\-_=+^".,|]/g) || [];
+            const letters = text.match(/[a-zA-Z]/g) || [];
+
+            // If special chars outnumber letters significantly, it's likely ASCII art
+            if (specialChars.length > letters.length * 2 && text.length > 50) {
+                return true;
+            }
+
+            // Check for repeated patterns like .''' or ---
+            if (/(.)\1{4,}/.test(text)) {
+                return true;
+            }
+
+            // Check for dot/dash heavy content
+            const dotDashRatio = (text.match(/[.'\-_:=+]/g) || []).length / text.length;
+            if (dotDashRatio > 0.5 && text.length > 30) {
+                return true;
+            }
+
+            return false;
+        };
+
+        const addLine = (text: string, prefix = "") => {
+            const clean = text.trim().replace(/\s+/g, " ");
+
+            // Skip if too short, already seen, or ASCII art
+            if (!clean || clean.length < 10 || seen.has(clean) || isAsciiArt(clean)) {
+                return;
+            }
+
+            seen.add(clean);
+            lines.push(prefix ? `${prefix} ${clean}` : clean);
+        };
 
         // Process headings
         document.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach((el) => {
             const level = parseInt(el.tagName[1]);
             const prefix = "#".repeat(level);
-            const text = el.textContent?.trim();
-            if (text) lines.push(`${prefix} ${text}`);
+            const text = el.textContent || "";
+            addLine(text, prefix);
+        });
+
+        // Process pricing cards (common patterns for SaaS pricing)
+        const pricingSelectors = [
+            "[class*='price']",
+            "[class*='plan']",
+            "[class*='tier']",
+            "[class*='pricing']",
+            "[class*='card']",
+            "[data-plan]",
+            "[data-price]",
+        ];
+
+        pricingSelectors.forEach(sel => {
+            document.querySelectorAll(sel).forEach((el) => {
+                const text = el.textContent || "";
+                // Only add if it looks like pricing content
+                if (/\$[\d,]+|\d+\s*\/\s*mo|free|credits|month|year/i.test(text)) {
+                    addLine(text);
+                }
+            });
         });
 
         // Process paragraphs and list items
         document.querySelectorAll("p, li").forEach((el) => {
-            const text = el.textContent?.trim();
-            if (text && text.length > 20) lines.push(text);
+            const text = el.textContent || "";
+            if (text.length > 20) addLine(text);
         });
 
         // Process tables
@@ -68,9 +134,27 @@ function extractContent(page: Page): Promise<{ markdown: string; rawText: string
                     const text = cell.textContent?.trim();
                     if (text) cells.push(text);
                 });
-                if (cells.length) lines.push(`| ${cells.join(" | ")} |`);
+                if (cells.length) addLine(`| ${cells.join(" | ")} |`);
             });
         });
+
+        // Fallback: Get ALL visible text if we didn't capture much
+        if (lines.length < 10) {
+            const main = document.querySelector("main") || document.body;
+            const walker = document.createTreeWalker(
+                main,
+                NodeFilter.SHOW_TEXT,
+                null
+            );
+
+            let node;
+            while ((node = walker.nextNode())) {
+                const text = node.textContent || "";
+                if (text.trim().length > 15) {
+                    addLine(text);
+                }
+            }
+        }
 
         const markdown = lines.join("\n\n");
         const rawText = markdown
@@ -92,14 +176,40 @@ export async function fetchPagePlaywright(url: string): Promise<CrawlResponse> {
         // Set realistic viewport and user agent
         await page.setViewportSize({ width: 1280, height: 800 });
 
-        // Navigate with timeout
+        // Navigate with timeout and wait for network to settle
         await page.goto(url, {
             timeout: TIMEOUT_MS,
-            waitUntil: "domcontentloaded",
+            waitUntil: "networkidle",
         });
 
-        // Wait for content to stabilize
-        await page.waitForTimeout(2000);
+        // Wait for JS content to render
+        await page.waitForTimeout(3000);
+
+        // Scroll to trigger lazy-loaded pricing content
+        await page.evaluate(() => {
+            window.scrollTo(0, document.body.scrollHeight / 2);
+        });
+        await page.waitForTimeout(1500);
+
+        // Try to find and click monthly/yearly toggle if present
+        const toggleSelectors = [
+            "[class*='toggle']",
+            "[class*='switch']",
+            "button:has-text('Monthly')",
+            "button:has-text('Yearly')",
+        ];
+        for (const sel of toggleSelectors) {
+            try {
+                const toggle = page.locator(sel).first();
+                if (await toggle.isVisible({ timeout: 500 })) {
+                    await toggle.click();
+                    await page.waitForTimeout(500);
+                    break;
+                }
+            } catch {
+                // Not found, continue
+            }
+        }
 
         const { markdown, rawText } = await extractContent(page);
 

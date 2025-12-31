@@ -20,21 +20,41 @@ function htmlToMarkdown($: cheerio.CheerioAPI): string {
     // Remove noise elements
     $("script, style, noscript, iframe, nav, footer, header, aside").remove();
     $("[class*='cookie'], [class*='banner'], [class*='popup'], [id*='cookie']").remove();
+    $("[aria-hidden='true']").remove(); // Remove hidden elements
+    $(".sr-only, .visually-hidden").remove(); // Remove screen-reader-only duplicates
 
     const lines: string[] = [];
+    const seen = new Set<string>(); // Deduplication
+
+    // Helper to add line if not seen
+    const addLine = (text: string, prefix = "") => {
+        const clean = text.trim().replace(/\s+/g, " ");
+        if (clean && clean.length > 10 && !seen.has(clean)) {
+            seen.add(clean);
+            lines.push(prefix ? `${prefix} ${clean}` : clean);
+        }
+    };
 
     // Process headings
     $("h1, h2, h3, h4, h5, h6").each((_, el) => {
         const level = parseInt(el.tagName[1]);
         const prefix = "#".repeat(level);
+        // Get direct text only, not nested elements
+        const text = $(el).clone().children().remove().end().text().trim()
+            || $(el).text().trim();
+        addLine(text, prefix);
+    });
+
+    // Process pricing cards and divs with data-* attributes (common for React)
+    $("[class*='price'], [class*='plan'], [class*='tier'], [data-plan]").each((_, el) => {
         const text = $(el).text().trim();
-        if (text) lines.push(`${prefix} ${text}`);
+        addLine(text);
     });
 
     // Process paragraphs and list items
     $("p, li").each((_, el) => {
         const text = $(el).text().trim();
-        if (text && text.length > 20) lines.push(text);
+        if (text.length > 20) addLine(text);
     });
 
     // Process tables (important for pricing pages)
@@ -48,8 +68,22 @@ function htmlToMarkdown($: cheerio.CheerioAPI): string {
                     .each((_, cell) => {
                         cells.push($(cell).text().trim());
                     });
-                if (cells.length) lines.push(`| ${cells.join(" | ")} |`);
+                if (cells.length) {
+                    const rowText = `| ${cells.join(" | ")} |`;
+                    addLine(rowText);
+                }
             });
+    });
+
+    // Also extract any text containing price patterns
+    $("*").each((_, el) => {
+        const $el = $(el);
+        if ($el.children().length === 0) { // Leaf nodes only
+            const text = $el.text().trim();
+            if (/\$[\d,]+|\d+\s*\/\s*mo|free|enterprise|contact/i.test(text)) {
+                addLine(text);
+            }
+        }
     });
 
     return lines.join("\n\n");

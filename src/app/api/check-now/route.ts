@@ -88,6 +88,29 @@ export async function POST(request: NextRequest) {
         // Normalize and save snapshot
         const { normalizedText, hash } = createNormalizedSnapshot(crawlResult.rawText);
 
+        // DEBUG: Save to file for inspection
+        const fs = await import("fs/promises");
+        const debugDir = "/Users/bharath/Desktop/SaaS_projects/rivaleye/debug";
+        await fs.mkdir(debugDir, { recursive: true });
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        await fs.writeFile(
+            `${debugDir}/snapshot_${timestamp}_raw.txt`,
+            crawlResult.rawText,
+            "utf-8"
+        );
+        await fs.writeFile(
+            `${debugDir}/snapshot_${timestamp}_markdown.md`,
+            crawlResult.markdown,
+            "utf-8"
+        );
+        await fs.writeFile(
+            `${debugDir}/snapshot_${timestamp}_normalized.txt`,
+            normalizedText,
+            "utf-8"
+        );
+        console.log(`[DEBUG] Saved snapshot files to ${debugDir}/snapshot_${timestamp}_*`);
+
         await supabase.from("snapshots").insert({
             competitor_id: competitorId,
             hash,

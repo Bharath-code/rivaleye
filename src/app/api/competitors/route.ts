@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import { getUserId } from "@/lib/auth";
+import { getUserId, getCurrentUser } from "@/lib/auth";
 
 /**
  * Competitors API
@@ -10,6 +10,37 @@ import { getUserId } from "@/lib/auth";
  * DELETE - Remove competitor
  */
 
+/**
+ * Ensures user exists in our users table (auto-creates if missing)
+ */
+async function ensureUserExists(userId: string): Promise<void> {
+    const supabase = createServerClient();
+
+    const { data: existingUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", userId)
+        .single();
+
+    if (!existingUser) {
+        // Get user email from auth
+        const user = await getCurrentUser();
+        const email = user?.email || `user-${userId}@temp.local`;
+
+        await supabase.from("users").insert({
+            id: userId,
+            email: email,
+            plan: "free",
+            subscription_status: "none",
+            crawls_today: 0,
+            manual_checks_today: 0,
+            last_quota_reset: new Date().toISOString(),
+        });
+
+        console.log(`Created user record for ${userId}`);
+    }
+}
+
 // GET /api/competitors
 export async function GET() {
     try {
@@ -18,6 +49,8 @@ export async function GET() {
         if (!userId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+
+        await ensureUserExists(userId);
 
         const supabase = createServerClient();
 
@@ -47,6 +80,8 @@ export async function POST(request: NextRequest) {
         if (!userId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+
+        await ensureUserExists(userId);
 
         const body = await request.json();
         const { name, url } = body;

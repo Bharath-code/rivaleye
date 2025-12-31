@@ -52,11 +52,20 @@ export async function fetchPageWithFallback(
     const cheerioResult = await fetchPageCheerio(url);
 
     if (cheerioResult.success) {
-        return { ...cheerioResult, source: "cheerio" };
-    }
+        // Quality check: if content is suspiciously short, it might be JS-rendered
+        const contentLength = cheerioResult.rawText.length;
+        const hasNumbers = /\$[\d,]+|\d+\/mo|\d+ credits/i.test(cheerioResult.rawText);
 
-    results.push({ source: "cheerio", result: cheerioResult });
-    console.log(`[Crawler] Cheerio failed: ${cheerioResult.error}, falling back to Playwright...`);
+        // For pricing pages, we expect numbers and decent content
+        if (contentLength > 500 || hasNumbers) {
+            return { ...cheerioResult, source: "cheerio" };
+        }
+
+        console.log(`[Crawler] Cheerio content too short (${contentLength} chars) or missing pricing data, trying Playwright...`);
+    } else {
+        results.push({ source: "cheerio", result: cheerioResult });
+        console.log(`[Crawler] Cheerio failed: ${cheerioResult.error}, falling back to Playwright...`);
+    }
 
     // Tier 3: Playwright (full browser, JS execution)
     console.log(`[Crawler] Trying Playwright for: ${url}`);

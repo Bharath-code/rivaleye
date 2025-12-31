@@ -60,6 +60,8 @@ export default function Dashboard() {
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [checkingId, setCheckingId] = useState<string | null>(null);
+    const [checkSuccess, setCheckSuccess] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
         try {
@@ -122,6 +124,50 @@ export default function Dashboard() {
         }
     };
 
+    const handleCheckNow = async (competitorId: string) => {
+        setCheckingId(competitorId);
+
+        try {
+            const res = await fetch("/api/check-now", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ competitorId }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                alert(data.error || "Check failed");
+                return;
+            }
+
+            // Update the competitor's last_checked_at
+            setCompetitors((prev) =>
+                prev.map((c) =>
+                    c.id === competitorId
+                        ? { ...c, last_checked_at: new Date().toISOString(), failure_count: 0 }
+                        : c
+                )
+            );
+
+            // Refresh alerts
+            const alertsRes = await fetch("/api/alerts");
+            if (alertsRes.ok) {
+                const alertsData = await alertsRes.json();
+                setAlerts(alertsData.alerts || []);
+            }
+
+            // Show success message
+            const competitor = competitors.find((c) => c.id === competitorId);
+            setCheckSuccess(`✓ ${competitor?.name || "Page"} checked successfully. Snapshot saved.`);
+            setTimeout(() => setCheckSuccess(null), 4000);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Check failed");
+        } finally {
+            setCheckingId(null);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex-1 flex flex-col min-h-screen">
@@ -158,6 +204,15 @@ export default function Dashboard() {
     return (
         <div className="flex-1 flex flex-col min-h-screen">
             <Header />
+
+            {/* Success Toast */}
+            {checkSuccess && (
+                <div className="fixed top-20 right-4 z-50 animate-in fade-in slide-in-from-top-2">
+                    <div className="bg-emerald-500/90 text-white px-4 py-3 rounded-lg shadow-lg text-sm">
+                        {checkSuccess}
+                    </div>
+                </div>
+            )}
 
             <main className="flex-1 pt-24 pb-12 px-6">
                 <div className="max-w-6xl mx-auto">
@@ -305,9 +360,24 @@ export default function Dashboard() {
                                                     )}
                                                 </div>
                                                 <div className="flex gap-2 mt-4">
-                                                    <Button variant="outline" size="sm" className="flex-1 text-xs">
-                                                        <RefreshCw className="w-3 h-3 mr-1" />
-                                                        Check Now
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="flex-1 text-xs"
+                                                        onClick={() => handleCheckNow(competitor.id)}
+                                                        disabled={checkingId === competitor.id}
+                                                    >
+                                                        {checkingId === competitor.id ? (
+                                                            <>
+                                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                                Checking...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <RefreshCw className="w-3 h-3 mr-1" />
+                                                                Check Now
+                                                            </>
+                                                        )}
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
