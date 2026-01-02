@@ -65,7 +65,16 @@ export async function GET() {
             return NextResponse.json({ error: "Failed to fetch competitors" }, { status: 500 });
         }
 
-        return NextResponse.json({ competitors });
+        const { data: user } = await supabase
+            .from("users")
+            .select("plan")
+            .eq("id", userId)
+            .single();
+
+        return NextResponse.json({
+            competitors,
+            plan: user?.plan || "free"
+        });
     } catch (error) {
         console.error("Unexpected error:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -117,10 +126,12 @@ export async function POST(request: NextRequest) {
             .select("*", { count: "exact", head: true })
             .eq("user_id", userId);
 
-        // Free plan: 1 competitor, Pro: unlimited
-        if (user?.plan === "free" && (existingCount ?? 0) >= 1) {
+        const userPlan = (user?.plan || "free") as "free" | "pro" | "enterprise";
+        const flags = require("@/lib/billing/featureFlags").getFeatureFlags(userPlan);
+
+        if ((existingCount ?? 0) >= flags.maxCompetitors) {
             return NextResponse.json(
-                { error: "Free plan limited to 1 competitor. Upgrade to Pro for unlimited." },
+                { error: `Free plan limited to ${flags.maxCompetitors} competitor. Upgrade to Pro for more.` },
                 { status: 403 }
             );
         }

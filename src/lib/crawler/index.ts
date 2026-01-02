@@ -132,3 +132,10 @@ export async function fetchPageWithRetry(
 // Re-export for convenience
 export { fetchPageCheerio } from "./cheerio";
 export { fetchPagePlaywright, closeBrowser } from "./playwright";
+
+// Geo-aware scraping (v2)
+export { scrapeWithGeoContext, closeGeoBrowser } from "./geoPlaywright";
+export { getGeoContextConfig, getExpectedCurrency, getCurrencySymbols } from "./geoContext";
+export { decideScraper, isFirecrawlAvailable, shouldUpgradeToPlaywright } from "./decideScraper";
+export { uploadScreenshot, getScreenshotUrl, cleanupOldScreenshots } from "./screenshotStorage";
+

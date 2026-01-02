@@ -8,30 +8,21 @@ import type { User } from "@/lib/types";
  * Protects Firecrawl + AI spend while keeping UX smooth.
  */
 
-// ══════════════════════════════════════════════════════════════════════════════
-// QUOTA LIMITS (from unit_economics.md)
-// ══════════════════════════════════════════════════════════════════════════════
+import { PLAN_LIMITS } from "./billing/featureFlags";
 
-export const QUOTA_LIMITS = {
-    free: {
-        maxActivePages: 1,
-        scheduledCrawlsPerDay: 1,
-        manualChecksPerDay: 1,
-        failureRetries: 0,
-    },
-    pro: {
-        maxActivePages: 25, // Soft cap
-        scheduledCrawlsPerDay: 50, // Generous but bounded
-        manualChecksPerDay: 5,
-        failureRetries: 1,
-    },
-} as const;
+/**
+ * Quota Management System
+ *
+ * Enforces per-user limits based on plan tier.
+ * Protects Firecrawl + AI spend while keeping UX smooth.
+ */
 
 // Global safety limits
 export const GLOBAL_LIMITS = {
     maxDailyCrawls: 100000, // Kill switch threshold
     crawlSpikeMultiplier: 1.5, // Trigger throttle if exceeds expected * this
 };
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // QUOTA CHECKS
@@ -47,9 +38,10 @@ export interface QuotaCheckResult {
  * Check if user can perform a scheduled crawl
  */
 export function canScheduledCrawl(user: User): QuotaCheckResult {
-    const limits = QUOTA_LIMITS[user.plan];
+    const limits = PLAN_LIMITS[user.plan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
+    const maxCrawls = (limits as any).scheduledCrawlsPerDay || 50; // Fallback for Pro
 
-    if (user.crawls_today >= limits.scheduledCrawlsPerDay) {
+    if (user.crawls_today >= maxCrawls) {
         return {
             allowed: false,
             reason: "Daily crawl limit reached",
@@ -64,9 +56,11 @@ export function canScheduledCrawl(user: User): QuotaCheckResult {
  * Check if user can perform a manual "Check Now"
  */
 export function canManualCheck(user: User): QuotaCheckResult {
-    const limits = QUOTA_LIMITS[user.plan];
+    const limits = PLAN_LIMITS[user.plan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
+    // Note: featureFlags.ts needs manualChecksPerDay added to its interface
+    const maxManual = (limits as any).manualChecksPerDay || (user.plan === "pro" ? 5 : 1);
 
-    if (user.manual_checks_today >= limits.manualChecksPerDay) {
+    if (user.manual_checks_today >= maxManual) {
         return {
             allowed: false,
             reason: "You've reached today's manual check limit. We'll check again tomorrow.",
@@ -83,9 +77,9 @@ export function canManualCheck(user: User): QuotaCheckResult {
 export async function canAddPage(
     supabase: SupabaseClient,
     userId: string,
-    plan: "free" | "pro"
+    plan: "free" | "pro" | "enterprise"
 ): Promise<QuotaCheckResult> {
-    const limits = QUOTA_LIMITS[plan];
+    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
 
     const { count } = await supabase
         .from("competitors")
@@ -95,17 +89,17 @@ export async function canAddPage(
 
     const currentCount = count ?? 0;
 
-    if (currentCount >= limits.maxActivePages) {
+    if (currentCount >= limits.maxCompetitors) {
         if (plan === "free") {
             return {
                 allowed: false,
-                reason: "Free plan limited to 1 competitor. Upgrade to Pro for unlimited.",
+                reason: `Free plan limited to ${limits.maxCompetitors} competitor. Upgrade to Pro for more.`,
                 upgradePrompt: true,
             };
         } else {
             return {
                 allowed: false,
-                reason: "You've reached the maximum pages. Contact us if you need more.",
+                reason: `You've reached the limit of ${limits.maxCompetitors} competitors on your plan. Contact us if you need more.`,
                 upgradePrompt: false,
             };
         }

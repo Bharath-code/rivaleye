@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
@@ -17,7 +17,7 @@ const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
 );
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
@@ -86,50 +86,70 @@ export default function AuthCallbackPage() {
     }, [router, searchParams]);
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center px-6 dot-grid">
-            <div className="w-full max-w-md text-center">
-                {status === "loading" && (
-                    <>
-                        <Loader2 className="w-12 h-12 animate-spin text-emerald-500 mx-auto mb-4" />
-                        <h1 className="font-display text-xl text-foreground mb-2">
-                            Signing you in...
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Please wait while we verify your identity.
-                        </p>
-                    </>
-                )}
+        <div className="w-full max-w-md text-center">
+            {status === "loading" && (
+                <>
+                    <Loader2 className="w-12 h-12 animate-spin text-emerald-500 mx-auto mb-4" />
+                    <h1 className="font-display text-xl text-foreground mb-2">
+                        Signing you in...
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        Please wait while we verify your identity.
+                    </p>
+                </>
+            )}
 
-                {status === "success" && (
-                    <>
-                        <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
-                        <h1 className="font-display text-xl text-foreground mb-2">
-                            Welcome back!
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Redirecting to your dashboard...
-                        </p>
-                    </>
-                )}
+            {status === "success" && (
+                <>
+                    <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
+                    <h1 className="font-display text-xl text-foreground mb-2">
+                        Welcome back!
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        Redirecting to your dashboard...
+                    </p>
+                </>
+            )}
 
-                {status === "error" && (
-                    <>
-                        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                        <h1 className="font-display text-xl text-foreground mb-2">
-                            Sign in failed
-                        </h1>
-                        <p className="text-sm text-muted-foreground mb-4">
-                            {errorMessage || "Please try again."}
-                        </p>
-                        <button
-                            onClick={() => router.push("/login")}
-                            className="text-emerald-400 hover:underline text-sm"
-                        >
-                            Back to login
-                        </button>
-                    </>
-                )}
-            </div>
+            {status === "error" && (
+                <>
+                    <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                    <h1 className="font-display text-xl text-foreground mb-2">
+                        Sign in failed
+                    </h1>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        {errorMessage || "Please try again."}
+                    </p>
+                    <button
+                        onClick={() => router.push("/login")}
+                        className="text-emerald-400 hover:underline text-sm"
+                    >
+                        Back to login
+                    </button>
+                </>
+            )}
         </div>
     );
 }
+
+function LoadingFallback() {
+    return (
+        <div className="w-full max-w-md text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-emerald-500 mx-auto mb-4" />
+            <h1 className="font-display text-xl text-foreground mb-2">
+                Loading...
+            </h1>
+        </div>
+    );
+}
+
+export default function AuthCallbackPage() {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center px-6 dot-grid">
+            <Suspense fallback={<LoadingFallback />}>
+                <AuthCallbackContent />
+            </Suspense>
+        </div>
+    );
+}
+

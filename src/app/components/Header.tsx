@@ -1,6 +1,46 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+import { useRouter, usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Loader2, LogOut, LayoutDashboard } from "lucide-react";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
+);
 
 export default function Header() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/");
+    router.refresh();
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border glass-card">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -29,19 +69,44 @@ export default function Header() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-6">
-          <Link
-            href="/dashboard"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Dashboard
-          </Link>
-          <Link
-            href="/login"
-            className="text-sm font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            Sign In
-          </Link>
+        <nav className="flex items-center gap-4">
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground mr-4" />
+          ) : user ? (
+            <>
+              {pathname !== "/dashboard" && (
+                <Link href="/dashboard">
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <LayoutDashboard className="w-4 h-4" />
+                    Dashboard
+                  </Button>
+                </Link>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-red-400 gap-2"
+                onClick={handleLogout}
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/#pricing"
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block"
+              >
+                Pricing
+              </Link>
+              <Link href="/login">
+                <Button size="sm" className="glow-emerald">
+                  Sign In
+                </Button>
+              </Link>
+            </>
+          )}
         </nav>
       </div>
     </header>

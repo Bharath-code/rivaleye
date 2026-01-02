@@ -7,10 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, ExternalLink, RefreshCw, Clock, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Plus, ExternalLink, RefreshCw, Clock, AlertCircle, CheckCircle2, Loader2, Sparkles, LineChart, History, Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { DashboardAlertSummary } from "@/components/alerts";
+import type { PricingDiffType, AlertSeverity } from "@/lib/types";
+import { MarketRadar, PricingTrendChart } from "@/components/charts";
+import { cn } from "@/lib/utils";
 
 interface Competitor {
     id: string;
@@ -28,8 +32,19 @@ interface Alert {
     diff_summary: string;
     ai_insight: string;
     is_meaningful: boolean;
+    is_read?: boolean;
+    type?: "price_increase" | "price_decrease" | "plan_added" | "plan_removed" | "free_tier_removed" | "free_tier_added" | "plan_promoted" | "cta_changed" | "regional_difference";
+    severity?: "high" | "medium" | "low";
+    title?: string;
+    description?: string;
+    details?: {
+        context?: string;
+        before?: string | null;
+        after?: string | null;
+        aiExplanation?: string;
+    };
     created_at: string;
-    competitors: {
+    competitors?: {
         name: string;
     };
 }
@@ -62,6 +77,12 @@ export default function Dashboard() {
     const [error, setError] = useState<string | null>(null);
     const [checkingId, setCheckingId] = useState<string | null>(null);
     const [checkSuccess, setCheckSuccess] = useState<string | null>(null);
+    const [userPlan, setUserPlan] = useState<"free" | "pro" | "enterprise">("free");
+    const [radarData, setRadarData] = useState<any[]>([]);
+    const [isRadarLoading, setIsRadarLoading] = useState(false);
+    const [selectedHistoryComp, setSelectedHistoryComp] = useState<Competitor | null>(null);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+    const [historyChartData, setHistoryChartData] = useState<any[]>([]);
 
     const fetchData = useCallback(async () => {
         try {
@@ -83,7 +104,19 @@ export default function Dashboard() {
             const alertsData = await alertsRes.json();
 
             setCompetitors(competitorsData.competitors || []);
+            setUserPlan(competitorsData.plan || "free");
             setAlerts(alertsData.alerts || []);
+
+            // Handle Radar Data (Pro Only)
+            if (competitorsData.plan !== "free") {
+                setIsRadarLoading(true);
+                const radarRes = await fetch("/api/market-radar");
+                if (radarRes.ok) {
+                    const radarJson = await radarRes.json();
+                    setRadarData(radarJson.data || []);
+                }
+                setIsRadarLoading(false);
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load data");
         } finally {
@@ -121,6 +154,47 @@ export default function Dashboard() {
             setSubmitError(err instanceof Error ? err.message : "Failed to add competitor");
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleViewHistory = async (comp: Competitor) => {
+        if (userPlan === "free") {
+            window.open("/#pricing", "_blank");
+            return;
+        }
+
+        setSelectedHistoryComp(comp);
+        setIsHistoryLoading(true);
+        try {
+            const res = await fetch(`/api/competitors/${comp.id}/history`);
+            if (res.ok) {
+                const data = await res.json();
+
+                // Process history data for the chart
+                // We take the cheapest plan price for the trend
+                const chartPoints = data.history.map((h: any) => {
+                    const plans = h.plans || [];
+                    const prices = plans
+                        .map((p: any) => {
+                            const priceStr = p.price_raw?.replace(/[^0-9.]/g, '');
+                            return parseFloat(priceStr || '0');
+                        })
+                        .filter((v: number) => v > 0);
+
+                    const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+
+                    return {
+                        date: h.date,
+                        price: minPrice
+                    };
+                }).filter((p: any) => p.price > 0);
+
+                setHistoryChartData(chartPoints);
+            }
+        } catch (err) {
+            console.error("Failed to load history:", err);
+        } finally {
+            setIsHistoryLoading(false);
         }
     };
 
@@ -403,84 +477,149 @@ export default function Dashboard() {
                     {/* Dashboard Header */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                         <div>
-                            <h1 className="font-display text-3xl text-foreground mb-1">
-                                Dashboard
-                            </h1>
+                            <div className="flex items-center gap-3 mb-1">
+                                <h1 className="font-display text-4xl text-foreground">Dashboard</h1>
+                                <Badge variant={userPlan === "free" ? "outline" : "default"} className={cn(
+                                    "uppercase tracking-wider text-[10px]",
+                                    userPlan === "pro" && "bg-emerald-500 text-black hover:bg-emerald-600 font-bold",
+                                    userPlan === "enterprise" && "bg-purple-500 text-white hover:bg-purple-600 font-bold"
+                                )}>
+                                    {userPlan}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground font-mono bg-muted/30 px-2 py-1 rounded">
+                                    {competitors.length} / {userPlan === "free" ? 1 : userPlan === "pro" ? 5 : "10"} Competitors
+                                </span>
+                            </div>
                             <p className="text-muted-foreground">
-                                Monitor your competitors and stay informed.
+                                Monitoring your competitors for changes.
                             </p>
                         </div>
-
-                        <Dialog open={isAddingCompetitor} onOpenChange={setIsAddingCompetitor}>
-                            <DialogTrigger asChild>
-                                <Button className="gap-2">
-                                    <Plus className="w-4 h-4" />
-                                    Add Competitor
+                        <div className="flex items-center gap-3">
+                            {userPlan === "free" && (
+                                <Button
+                                    variant="outline"
+                                    className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 gap-2 relative overflow-hidden group saber-border h-9"
+                                    onClick={() => router.push("/#pricing")}
+                                >
+                                    <Sparkles className="w-4 h-4" />
+                                    Upgrade to Pro
                                 </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-md">
-                                <DialogHeader>
-                                    <DialogTitle className="font-display text-xl">Add a Competitor</DialogTitle>
-                                    <DialogDescription>
-                                        Enter their pricing or homepage URL. We&apos;ll take a snapshot immediately.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <form onSubmit={handleAddCompetitor} className="space-y-4 mt-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="name">Competitor Name</Label>
-                                        <Input
-                                            id="name"
-                                            placeholder="e.g. Acme Corp"
-                                            value={competitorName}
-                                            onChange={(e) => setCompetitorName(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="url">Page URL</Label>
-                                        <Input
-                                            id="url"
-                                            type="url"
-                                            placeholder="https://acme.com/pricing"
-                                            value={competitorUrl}
-                                            onChange={(e) => setCompetitorUrl(e.target.value)}
-                                            required
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            Tip: Pricing pages work best for meaningful alerts.
-                                        </p>
-                                    </div>
-                                    {submitError && (
-                                        <p className="text-sm text-red-500">{submitError}</p>
-                                    )}
-                                    <div className="flex gap-3 pt-2">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => setIsAddingCompetitor(false)}
-                                            className="flex-1"
-                                        >
-                                            Cancel
-                                        </Button>
-                                        <Button
-                                            type="submit"
-                                            className="flex-1"
-                                            disabled={isSubmitting || !competitorName || !competitorUrl}
-                                        >
-                                            {isSubmitting ? (
-                                                <>
-                                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                                    Adding...
-                                                </>
-                                            ) : (
-                                                "Add & Monitor"
-                                            )}
-                                        </Button>
-                                    </div>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
+                            )}
+                            <Dialog open={isAddingCompetitor} onOpenChange={setIsAddingCompetitor}>
+                                <DialogTrigger asChild>
+                                    <Button className="glow-emerald gap-2">
+                                        <Plus className="w-4 h-4" />
+                                        Add Competitor
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-md">
+                                    <DialogHeader>
+                                        <DialogTitle className="font-display text-xl">Add a Competitor</DialogTitle>
+                                        <DialogDescription>
+                                            Enter their pricing or homepage URL. We&apos;ll take a snapshot immediately.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <form onSubmit={handleAddCompetitor} className="space-y-4 mt-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="name">Competitor Name</Label>
+                                            <Input
+                                                id="name"
+                                                placeholder="e.g. Acme Corp"
+                                                value={competitorName}
+                                                onChange={(e) => setCompetitorName(e.target.value)}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="url">Page URL</Label>
+                                            <Input
+                                                id="url"
+                                                type="url"
+                                                placeholder="https://acme.com/pricing"
+                                                value={competitorUrl}
+                                                onChange={(e) => setCompetitorUrl(e.target.value)}
+                                                required
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Tip: Pricing pages work best for meaningful alerts.
+                                            </p>
+                                        </div>
+                                        {submitError && (
+                                            <p className="text-sm text-red-500">{submitError}</p>
+                                        )}
+                                        <div className="flex gap-3 pt-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => setIsAddingCompetitor(false)}
+                                                className="flex-1"
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                type="submit"
+                                                className="flex-1"
+                                                disabled={isSubmitting || !competitorName || !competitorUrl}
+                                            >
+                                                {isSubmitting ? (
+                                                    <>
+                                                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                                        Adding...
+                                                    </>
+                                                ) : (
+                                                    "Add & Monitor"
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
                     </div>
+
+                    {/* Strategic Market Radar (Pro Only) */}
+                    {userPlan !== "free" && (
+                        <Card className="glass-card mb-8 overflow-hidden">
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle className="text-xl font-display">Market Positioning Radar</CardTitle>
+                                        <CardDescription>Competitive quadrant mapping: Feature Density vs. Starting Price</CardDescription>
+                                    </div>
+                                    <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">PRO ANALYSIS</Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                                    <MarketRadar entities={radarData} className="aspect-square max-w-[400px] mx-auto" />
+                                    <div className="space-y-4">
+                                        <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
+                                            <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Strategic Insight</h4>
+                                            <p className="text-sm leading-relaxed">
+                                                {radarData.length > 2 ? (
+                                                    "Your competitors are primarily clustered in the center. There's a clear 'Disruptor' white space in the top-left quadrant for a high-feature, mid-price offering."
+                                                ) : (
+                                                    "Add more competitors to unlock full quadrant analysis and spot market entry opportunities."
+                                                )}
+                                            </p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="text-center p-3 border rounded-lg bg-surface">
+                                                <div className="text-2xl font-display text-blue-400">{radarData.length}</div>
+                                                <div className="text-[10px] uppercase text-muted-foreground">Competitors Mapped</div>
+                                            </div>
+                                            <div className="text-center p-3 border rounded-lg bg-surface">
+                                                <div className="text-2xl font-display text-emerald-400">
+                                                    {radarData.length > 0 ? (radarData.reduce((acc, curr) => acc + curr.featureDensity, 0) / radarData.length).toFixed(1) : "0"}
+                                                </div>
+                                                <div className="text-[10px] uppercase text-muted-foreground">Avg Feature Score</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Competitors Column */}
@@ -491,21 +630,35 @@ export default function Dashboard() {
 
                             <div className="space-y-4">
                                 {competitors.length === 0 ? (
-                                    <Card className="glass-card">
-                                        <CardContent className="py-8 text-center">
-                                            <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                                                <Plus className="w-6 h-6 text-muted-foreground" />
+                                    <Card className="glass-card shadow-none border-dashed bg-transparent">
+                                        <CardContent className="py-12 text-center relative overflow-hidden">
+                                            {/* Architectural Background Pattern */}
+                                            <div className="absolute inset-0 pointer-events-none opacity-10">
+                                                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                                                    <defs>
+                                                        <pattern id="dotGridLarge" width="20" height="20" patternUnits="userSpaceOnUse">
+                                                            <circle cx="2" cy="2" r="1.5" fill="currentColor" className="text-muted-foreground" />
+                                                        </pattern>
+                                                    </defs>
+                                                    <rect width="100%" height="100%" fill="url(#dotGridLarge)" />
+                                                </svg>
                                             </div>
-                                            <p className="text-muted-foreground text-sm mb-4">
-                                                No competitors yet.<br />Add one to get started.
-                                            </p>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => setIsAddingCompetitor(true)}
-                                            >
-                                                Add Competitor
-                                            </Button>
+
+                                            <div className="relative z-10">
+                                                <div className="w-16 h-16 rounded-full bg-muted/30 border border-muted/50 flex items-center justify-center mx-auto mb-6">
+                                                    <Plus className="w-8 h-8 text-muted-foreground/30" />
+                                                </div>
+                                                <h3 className="text-base font-display text-foreground mb-2">Build Your Intelligence Grid</h3>
+                                                <p className="text-sm text-muted-foreground max-w-[240px] mx-auto mb-8 leading-relaxed">
+                                                    Add your first competitor to begin mapping the market landscape.
+                                                </p>
+                                                <Button
+                                                    className="glow-emerald"
+                                                    onClick={() => setIsAddingCompetitor(true)}
+                                                >
+                                                    Initialize Monitoring
+                                                </Button>
+                                            </div>
                                         </CardContent>
                                     </Card>
                                 ) : (
@@ -519,12 +672,32 @@ export default function Dashboard() {
                                                     <CardTitle className="text-base font-medium">
                                                         {competitor.name}
                                                     </CardTitle>
-                                                    <Badge
-                                                        variant={competitor.status === "active" ? "default" : "secondary"}
-                                                        className="text-xs"
-                                                    >
-                                                        {competitor.status}
-                                                    </Badge>
+                                                    <div className="flex items-center gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="w-7 h-7 text-muted-foreground hover:text-emerald-400"
+                                                            onClick={() => handleViewHistory(competitor)}
+                                                            title="View History"
+                                                        >
+                                                            <LineChart className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="w-7 h-7 text-muted-foreground hover:text-foreground"
+                                                            onClick={() => window.open(competitor.url, "_blank")}
+                                                            title="Direct Link"
+                                                        >
+                                                            <ExternalLink className="w-4 h-4" />
+                                                        </Button>
+                                                        <Badge
+                                                            variant={competitor.status === "active" ? "default" : "secondary"}
+                                                            className="text-[10px] h-5"
+                                                        >
+                                                            {competitor.status}
+                                                        </Badge>
+                                                    </div>
                                                 </div>
                                                 <CardDescription className="text-xs truncate">
                                                     {competitor.url}
@@ -543,52 +716,33 @@ export default function Dashboard() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="flex gap-2 mt-4">
+                                                <div className="grid grid-cols-2 gap-2 mt-4">
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        className="flex-1 text-xs"
+                                                        className="text-xs h-8 bg-surface-elevated/50 flex items-center gap-2 group hover:border-emerald-500/30"
                                                         onClick={() => handleCheckNow(competitor.id)}
                                                         disabled={checkingId === competitor.id}
                                                     >
                                                         {checkingId === competitor.id ? (
-                                                            <>
-                                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                                Checking...
-                                                            </>
+                                                            <Loader2 className="w-3 h-3 animate-spin" />
                                                         ) : (
-                                                            <>
-                                                                <RefreshCw className="w-3 h-3 mr-1" />
-                                                                Check Now
-                                                            </>
+                                                            <RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />
                                                         )}
+                                                        Check
                                                     </Button>
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        className="flex-1 text-xs bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20"
+                                                        className="text-xs h-8 bg-emerald-500/5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10"
                                                         onClick={() => handleAnalyze(competitor.id)}
                                                         disabled={analyzingId === competitor.id}
                                                     >
                                                         {analyzingId === competitor.id ? (
-                                                            <>
-                                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                                Analyzing...
-                                                            </>
+                                                            <Loader2 className="w-3 h-3 animate-spin" />
                                                         ) : (
-                                                            <>
-                                                                <span className="mr-1">🔍</span>
-                                                                Analyze
-                                                            </>
+                                                            <span>Analyze</span>
                                                         )}
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-xs"
-                                                        onClick={() => window.open(competitor.url, "_blank")}
-                                                    >
-                                                        <ExternalLink className="w-3 h-3" />
                                                     </Button>
                                                 </div>
                                             </CardContent>
@@ -600,75 +754,73 @@ export default function Dashboard() {
 
                         {/* Alerts Column */}
                         <div className="lg:col-span-2">
-                            <h2 className="font-mono text-sm text-muted-foreground uppercase tracking-wider mb-4">
-                                Recent Alerts
-                            </h2>
-
-                            <div className="space-y-4">
-                                {alerts.length === 0 ? (
-                                    <Card className="glass-card">
-                                        <CardContent className="py-12 text-center">
-                                            <CheckCircle2 className="w-12 h-12 text-emerald-500/50 mx-auto mb-4" />
-                                            <p className="text-muted-foreground">
-                                                No alerts yet. We&apos;ll email you when something changes.
-                                            </p>
-                                        </CardContent>
-                                    </Card>
-                                ) : (
-                                    alerts.map((alert) => {
-                                        let insight = { whatChanged: "", whyItMatters: "", whatToDo: "" };
-                                        try {
-                                            insight = JSON.parse(alert.ai_insight);
-                                        } catch {
-                                            insight.whatChanged = alert.diff_summary;
+                            <DashboardAlertSummary
+                                alerts={alerts.map((alert) => {
+                                    // Parse ai_insight to get title if needed
+                                    let parsedTitle = alert.title || alert.diff_summary;
+                                    try {
+                                        if (alert.ai_insight) {
+                                            const parsed = JSON.parse(alert.ai_insight);
+                                            parsedTitle = parsed.whatChanged || parsedTitle;
                                         }
+                                    } catch {
+                                        // Keep original title
+                                    }
 
-                                        return (
-                                            <Card
-                                                key={alert.id}
-                                                className="glass-card hover:border-emerald-500/30 transition-colors cursor-pointer border-l-2 border-l-emerald-500"
-                                            >
-                                                <CardHeader className="pb-2">
-                                                    <div className="flex items-start justify-between gap-4">
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="text-xs capitalize border-emerald-500/30 text-emerald-400"
-                                                                >
-                                                                    {alert.is_meaningful ? "meaningful" : "minor"}
-                                                                </Badge>
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    {alert.competitors?.name}
-                                                                </span>
-                                                            </div>
-                                                            <CardTitle className="text-base font-medium">
-                                                                {insight.whatChanged || alert.diff_summary}
-                                                            </CardTitle>
-                                                        </div>
-                                                    </div>
-                                                </CardHeader>
-                                                <CardContent>
-                                                    {insight.whyItMatters && (
-                                                        <p className="text-sm text-muted-foreground mb-2">
-                                                            {insight.whyItMatters}
-                                                        </p>
-                                                    )}
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {formatRelativeTime(alert.created_at)}
-                                                    </p>
-                                                </CardContent>
-                                            </Card>
-                                        );
-                                    })
-                                )}
-                            </div>
+                                    return {
+                                        id: alert.id,
+                                        competitor_name: alert.competitors?.name,
+                                        type: (alert.type || (alert.is_meaningful ? "price_increase" : "cta_changed")) as PricingDiffType,
+                                        severity: (alert.severity || (alert.is_meaningful ? "medium" : "low")) as AlertSeverity,
+                                        title: parsedTitle,
+                                        is_read: alert.is_read,
+                                        created_at: alert.created_at,
+                                    };
+                                })}
+                                onViewAlert={(id) => router.push(`/dashboard/alerts/${id}`)}
+                                onViewAll={() => router.push("/dashboard/alerts")}
+                            />
                         </div>
                     </div>
                 </div>
             </main>
 
-            <Footer />
+            {/* Pricing History Dialog */}
+            <Dialog open={!!selectedHistoryComp} onOpenChange={(open) => !open && setSelectedHistoryComp(null)}>
+                <DialogContent className="max-w-3xl glass-card">
+                    <DialogHeader>
+                        <div className="flex items-center gap-2 mb-2">
+                            <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">AGENTIC INTELLIGENCE</Badge>
+                        </div>
+                        <DialogTitle className="text-2xl font-display">{selectedHistoryComp?.name} Pricing Trajectory</DialogTitle>
+                        <DialogDescription>
+                            Historical Price Movements for {selectedHistoryComp?.url}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="py-6">
+                        {isHistoryLoading ? (
+                            <div className="h-[300px] flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
+                            </div>
+                        ) : historyChartData.length > 0 ? (
+                            <PricingTrendChart data={historyChartData} className="w-full" />
+                        ) : (
+                            <div className="h-[300px] flex flex-col items-center justify-center text-center p-8 bg-muted/20 rounded-xl border border-dashed">
+                                <History className="w-12 h-12 text-muted-foreground/30 mb-4" />
+                                <h4 className="font-medium text-foreground">Awaiting More Data</h4>
+                                <p className="text-sm text-muted-foreground max-w-xs mt-2">
+                                    Chronological pricing trends populate as RivalEye completes more daily checks for this competitor.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex justify-end pt-4">
+                        <Button variant="outline" onClick={() => setSelectedHistoryComp(null)}>Close Analysis</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
