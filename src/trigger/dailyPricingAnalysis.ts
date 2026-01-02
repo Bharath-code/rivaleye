@@ -1,6 +1,8 @@
 import { schedules, logger, metadata } from "@trigger.dev/sdk/v3";
 import { createClient } from "@supabase/supabase-js";
 import { checkPricingContext } from "./checkPricingContext";
+import { crossRegionComparison } from "./crossRegionComparison";
+import { getFeatureFlags } from "@/lib/billing/featureFlags";
 import type { PricingContext, Competitor } from "@/lib/types";
 
 /**
@@ -113,7 +115,25 @@ export const dailyPricingAnalysis = schedules.task({
             withChanges: 0,
             withAlerts: 0,
             errors: 0,
+            crossRegionTriggered: 0,
         };
+
+        // Group work items by competitor for cross-region comparison
+        const workByCompetitor = new Map<string, { userId: string; name: string; plan: string; contexts: typeof workQueue }>();
+        for (const work of workQueue) {
+            const existing = workByCompetitor.get(work.competitorId);
+            if (existing) {
+                existing.contexts.push(work);
+            } else {
+                const competitor = competitors.find(c => c.id === work.competitorId);
+                workByCompetitor.set(work.competitorId, {
+                    userId: work.userId,
+                    name: work.competitorName,
+                    plan: competitor?.users?.plan || "free",
+                    contexts: [work],
+                });
+            }
+        }
 
         // Step 5: Process work queue
         for (let i = 0; i < workQueue.length; i++) {
@@ -157,6 +177,33 @@ export const dailyPricingAnalysis = schedules.task({
 
             // Rate limiting between checks
             await new Promise((r) => setTimeout(r, CONFIG.delayBetweenChecks));
+        }
+
+        // Step 6: Trigger cross-region comparison for Pro users
+        metadata.set("step", "Cross-region comparisons");
+        for (const [competitorId, data] of workByCompetitor) {
+            const flags = getFeatureFlags(data.plan as "free" | "pro" | "enterprise");
+
+            // Only trigger if user has ≥2 regions and we processed ≥2 contexts for this competitor
+            if (flags.maxRegions >= 2 && data.contexts.length >= 2) {
+                try {
+                    await crossRegionComparison.trigger({
+                        competitorId,
+                        competitorName: data.name,
+                        userId: data.userId,
+                    });
+                    results.crossRegionTriggered++;
+                    logger.info("Cross-region comparison triggered", {
+                        competitor: data.name,
+                        contextsProcessed: data.contexts.length,
+                    });
+                } catch (error) {
+                    logger.error("Failed to trigger cross-region comparison", {
+                        competitor: data.name,
+                        error,
+                    });
+                }
+            }
         }
 
         // Final status
