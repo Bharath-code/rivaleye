@@ -9,6 +9,7 @@ export type UserPlan = "free" | "pro" | "enterprise";
 export interface FeatureFlags {
     maxCompetitors: number;
     maxPagesPerCompetitor: number;
+    maxRegions: number;
     canUseGeoAware: boolean;
     canViewAiInsights: boolean;
     canViewScreenshots: boolean;
@@ -25,6 +26,7 @@ export const PLAN_LIMITS: Record<UserPlan, FeatureFlags> = {
     free: {
         maxCompetitors: 1,
         maxPagesPerCompetitor: 1,
+        maxRegions: 1,
         canUseGeoAware: false,
         canViewAiInsights: false,
         canViewScreenshots: false,
@@ -39,6 +41,7 @@ export const PLAN_LIMITS: Record<UserPlan, FeatureFlags> = {
     pro: {
         maxCompetitors: 5,
         maxPagesPerCompetitor: Infinity,
+        maxRegions: 4,
         canUseGeoAware: true,
         canViewAiInsights: true,
         canViewScreenshots: true,
@@ -53,6 +56,7 @@ export const PLAN_LIMITS: Record<UserPlan, FeatureFlags> = {
     enterprise: {
         maxCompetitors: 50,
         maxPagesPerCompetitor: Infinity,
+        maxRegions: 4,
         canUseGeoAware: true,
         canViewAiInsights: true,
         canViewScreenshots: true,

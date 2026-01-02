@@ -354,9 +354,51 @@ function getAlertEmoji(type: PricingDiffType): string {
 // ══════════════════════════════════════════════════════════════════════════════
 
 export function renderAlertEmailToHtml(props: PricingAlertEmailProps): string {
-    // In production, use react-email or similar
-    // For now, return a basic version
-    const { competitorName, headline, beforeValue, afterValue, aiExplanation, detailsUrl } = props;
+    const {
+        competitorName,
+        headline,
+        beforeValue,
+        afterValue,
+        aiExplanation,
+        detailsUrl,
+        screenshotBeforeUrl,
+        screenshotAfterUrl,
+        severity = "medium",
+        confidence = "medium",
+    } = props;
+
+    const severityColors = {
+        high: { bg: "rgba(239, 68, 68, 0.15)", text: "#EF4444" },
+        medium: { bg: "rgba(245, 158, 11, 0.15)", text: "#F59E0B" },
+        low: { bg: "rgba(16, 185, 129, 0.15)", text: "#10B981" },
+    };
+
+    const severityStyle = severityColors[severity] || severityColors.medium;
+
+    // Generate screenshot HTML if URLs are provided
+    const screenshotHtml = (screenshotBeforeUrl || screenshotAfterUrl) ? `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
+        <tr>
+            ${screenshotBeforeUrl ? `
+            <td style="width: 48%; vertical-align: top;">
+                <div style="border-radius: 8px; overflow: hidden; border: 1px solid rgba(148, 163, 184, 0.1);">
+                    <div style="background-color: #1E293B; padding: 8px 12px; font-size: 12px; font-weight: 600; color: #94A3B8;">Before</div>
+                    <img src="${screenshotBeforeUrl}" alt="Before screenshot" style="width: 100%; height: auto; display: block;" />
+                </div>
+            </td>
+            ` : ''}
+            ${screenshotBeforeUrl && screenshotAfterUrl ? '<td style="width: 4%;"></td>' : ''}
+            ${screenshotAfterUrl ? `
+            <td style="width: 48%; vertical-align: top;">
+                <div style="border-radius: 8px; overflow: hidden; border: 1px solid rgba(16, 185, 129, 0.3);">
+                    <div style="background-color: rgba(16, 185, 129, 0.2); padding: 8px 12px; font-size: 12px; font-weight: 600; color: #10B981;">After</div>
+                    <img src="${screenshotAfterUrl}" alt="After screenshot" style="width: 100%; height: auto; display: block;" />
+                </div>
+            </td>
+            ` : ''}
+        </tr>
+    </table>
+    ` : '';
 
     return `
 <!DOCTYPE html>
@@ -370,18 +412,51 @@ export function renderAlertEmailToHtml(props: PricingAlertEmailProps): string {
     <div style="text-align: center; margin-bottom: 24px;">
         <h1 style="font-size: 24px; color: #10B981; margin: 0;">👁️ RivalEye</h1>
     </div>
-    <h2 style="font-size: 20px; margin-bottom: 16px; color: #F0F4F8;">${headline}</h2>
+    
+    <!-- Severity Badge -->
+    <div style="text-align: center; margin-bottom: 16px;">
+        <span style="display: inline-block; padding: 4px 12px; border-radius: 100px; font-size: 12px; font-weight: 600; background-color: ${severityStyle.bg}; color: ${severityStyle.text};">
+            ${severity.toUpperCase()} PRIORITY
+        </span>
+    </div>
+    
+    <h2 style="font-size: 20px; margin-bottom: 16px; color: #F0F4F8; text-align: center;">${headline}</h2>
+    
+    <!-- Before/After Values -->
     <div style="background: #111827; padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(148, 163, 184, 0.1);">
-        <p style="margin: 0 0 8px 0;"><strong style="color: #94A3B8;">Before:</strong> <span style="color: #F0F4F8;">${beforeValue || "—"}</span></p>
-        <p style="margin: 0;"><strong style="color: #94A3B8;">After:</strong> <span style="color: #10B981;">${afterValue || "—"}</span></p>
+        <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="text-align: center; padding: 12px;">
+                    <div style="font-size: 11px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Before</div>
+                    <div style="font-size: 18px; font-weight: 500; color: #F0F4F8;">${beforeValue || "—"}</div>
+                </td>
+                <td style="text-align: center; color: #10B981; font-size: 20px;">→</td>
+                <td style="text-align: center; padding: 12px;">
+                    <div style="font-size: 11px; font-weight: 600; color: #10B981; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">After</div>
+                    <div style="font-size: 18px; font-weight: 600; color: #10B981;">${afterValue || "—"}</div>
+                </td>
+            </tr>
+        </table>
     </div>
+    
+    <!-- Screenshots -->
+    ${screenshotHtml}
+    
+    <!-- AI Insight -->
     <div style="background: rgba(16, 185, 129, 0.1); padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(16, 185, 129, 0.3);">
-        <p style="margin: 0 0 8px 0;"><strong style="color: #10B981;">💡 Why It Matters:</strong></p>
-        <p style="margin: 0; color: #F0F4F8;">${aiExplanation}</p>
+        <p style="margin: 0 0 8px 0;">
+            <strong style="color: #10B981;">💡 Why It Matters</strong>
+            <span style="color: #94A3B8; font-size: 12px;"> (${confidence} confidence)</span>
+        </p>
+        <p style="margin: 0; color: #F0F4F8; line-height: 1.6;">${aiExplanation}</p>
     </div>
-    <div style="text-align: center;">
-        <a href="${detailsUrl}" style="display: inline-block; background: #10B981; color: #0A0E1A; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">View Details</a>
+    
+    <!-- CTA -->
+    <div style="text-align: center; margin-bottom: 24px;">
+        <a href="${detailsUrl}" style="display: inline-block; background: #10B981; color: #0A0E1A; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">View Full Details →</a>
     </div>
+    
+    <!-- Disclaimer -->
     <div style="margin-top: 24px; padding: 16px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; font-size: 12px; color: #F59E0B;">
         <strong>⚠️ Disclaimer:</strong> This alert was generated through automated analysis. Verify directly on the competitor's website before making business decisions.
     </div>

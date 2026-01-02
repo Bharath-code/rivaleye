@@ -251,6 +251,25 @@ export const checkPricingContext = task({
                         // Create alert in alerts table
                         const alertContent = formatAlertContent(diff, competitorName);
 
+                        // Convert screenshot paths to public URLs for email
+                        let screenshotUrl: string | null = null;
+                        let previousScreenshotUrl: string | null = null;
+
+                        if (screenshotPath) {
+                            const { data: publicData } = supabase.storage
+                                .from("screenshots")
+                                .getPublicUrl(screenshotPath);
+                            screenshotUrl = publicData?.publicUrl || null;
+                        }
+
+                        // Get previous snapshot's screenshot if available
+                        if (lastSnapshot?.screenshot_path) {
+                            const { data: prevPublicData } = supabase.storage
+                                .from("screenshots")
+                                .getPublicUrl(lastSnapshot.screenshot_path);
+                            previousScreenshotUrl = prevPublicData?.publicUrl || null;
+                        }
+
                         await supabase.from("alerts").insert({
                             user_id: userId,
                             competitor_id: competitorId,
@@ -265,6 +284,8 @@ export const checkPricingContext = task({
                                 aiExplanation,
                                 tacticalPlaybook,
                                 screenshotPath,
+                                screenshotUrl,
+                                previousScreenshotUrl,
                             },
                         });
 

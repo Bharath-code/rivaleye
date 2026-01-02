@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { DashboardAlertSummary } from "@/components/alerts";
+import { OnboardingWizard } from "@/components/onboarding";
 import type { PricingDiffType, AlertSeverity } from "@/lib/types";
 import { MarketRadar, PricingTrendChart } from "@/components/charts";
 import { cn } from "@/lib/utils";
@@ -83,6 +84,7 @@ export default function Dashboard() {
     const [selectedHistoryComp, setSelectedHistoryComp] = useState<Competitor | null>(null);
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
     const [historyChartData, setHistoryChartData] = useState<any[]>([]);
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
     const fetchData = useCallback(async () => {
         try {
@@ -106,6 +108,11 @@ export default function Dashboard() {
             setCompetitors(competitorsData.competitors || []);
             setUserPlan(competitorsData.plan || "free");
             setAlerts(alertsData.alerts || []);
+
+            // Show onboarding if no competitors
+            if ((competitorsData.competitors || []).length === 0) {
+                setShowOnboarding(true);
+            }
 
             // Handle Radar Data (Pro Only)
             if (competitorsData.plan !== "free") {
@@ -155,6 +162,26 @@ export default function Dashboard() {
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handleOnboardingComplete = async (url: string, name: string) => {
+        const res = await fetch("/api/competitors", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, url }),
+        });
+
+        if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "Failed to add competitor");
+        }
+
+        const data = await res.json();
+        setCompetitors((prev) => [data.competitor, ...prev]);
+    };
+
+    const handleOnboardingSkip = () => {
+        setShowOnboarding(false);
     };
 
     const handleViewHistory = async (comp: Competitor) => {
@@ -332,6 +359,14 @@ export default function Dashboard() {
     return (
         <div className="flex-1 flex flex-col min-h-screen">
             <Header />
+
+            {/* Onboarding Wizard */}
+            {showOnboarding && (
+                <OnboardingWizard
+                    onComplete={handleOnboardingComplete}
+                    onSkip={handleOnboardingSkip}
+                />
+            )}
 
             {/* Success Toast */}
             {checkSuccess && (
