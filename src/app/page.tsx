@@ -37,13 +37,13 @@ export default function Home() {
           {/* Headline */}
           <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl text-foreground leading-[1.1] mb-6">
             Your competitors just changed pricing. <br />
-            <span className="text-emerald-400 italic">You found out first.</span>
+            <span className="text-emerald-400 italic">You knew 6 hours ago.</span>
           </h1>
 
           {/* Subheadline */}
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-            RivalEye monitors competitor pricing pages from 8 global regions.
-            When they move, you get an <span className="text-foreground font-medium">AI-powered tactical brief</span> — not just an alert.
+            RivalEye monitors competitor pricing pages across 4 global regions.
+            When they move, you get an <span className="text-foreground font-medium">AI tactical brief</span> — not just a notification.
           </p>
 
           {/* CTAs */}
@@ -63,7 +63,7 @@ export default function Home() {
 
           {/* Trust Signal */}
           <p className="text-sm text-muted-foreground mt-8">
-            Free forever for 1 competitor • Setup in 30 seconds
+            Free forever for 1 competitor • Setup in 30 seconds • No credit card
           </p>
         </div>
       </section>
@@ -73,15 +73,19 @@ export default function Home() {
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-12 text-muted-foreground text-sm font-medium">
           <div className="flex items-center gap-2">
             <Check className="w-4 h-4 text-emerald-400" />
-            <span>Detects changes in &lt;24 hours</span>
+            <span>Daily automated scans</span>
           </div>
           <div className="flex items-center gap-2">
             <Globe2 className="w-4 h-4 text-emerald-400" />
-            <span>4 key global regions</span>
+            <span>4 global pricing regions</span>
           </div>
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-emerald-400" />
-            <span>AI explains the "Why"</span>
+            <span>AI explains the strategy shift</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Bell className="w-4 h-4 text-emerald-400" />
+            <span>Slack + Email alerts</span>
           </div>
         </div>
       </section>
@@ -272,12 +276,12 @@ export default function Home() {
 
             <p className="text-muted-foreground mb-8 leading-relaxed relative z-10">
               Competitors use IP-based pricing to hide localized strategies.
-              RivalEye deployments monitor from 8 global regions simultaneously,
+              RivalEye monitors from 4 key regions simultaneously,
               uncovering hidden discounts and regional test-pricing.
             </p>
 
-            <div className="grid grid-cols-4 sm:grid-cols-8 gap-3 relative z-10">
-              {["🇺🇸 US", "🇬🇧 UK", "🇩🇪 DE", "🇫🇷 FR", "🇮🇳 IN", "🇦🇺 AU", "🇧🇷 BR", "🇯🇵 JP"].map(
+            <div className="grid grid-cols-4 gap-3 relative z-10">
+              {["🇺🇸 United States", "🇪🇺 Europe", "🇮🇳 India", "🌍 Global"].map(
                 (region) => (
                   <div
                     key={region}
@@ -314,11 +318,11 @@ export default function Home() {
 
               <ul className="space-y-4 text-sm text-muted-foreground mb-10">
                 {[
-                  "1 competitor sensor",
-                  "Daily trajectory scans",
-                  "Standard email alerts",
-                  "Basic diff detection",
-                  "7-day history storage",
+                  "1 competitor tracking",
+                  "Daily automated scans",
+                  "Email alerts",
+                  "Basic change detection",
+                  "7-day history",
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-3">
                     <Check className="w-4 h-4 text-emerald-500/50" />
@@ -348,13 +352,14 @@ export default function Home() {
 
               <ul className="space-y-4 text-sm mb-10">
                 {[
-                  { text: "5 competitor sensors", highlight: false },
-                  { text: "Unlimited page depth", highlight: false },
-                  { text: "Frequent monitoring scans", highlight: false },
-                  { text: "4 Regional sensors (US, EU, IN)", highlight: true },
-                  { text: "AI Tactical Briefs", highlight: true },
-                  { text: "Visual verification (SVG/Images)", highlight: true },
-                  { text: "Unlimited delta history", highlight: false },
+                  { text: "5 competitors", highlight: false },
+                  { text: "Unlimited pages per competitor", highlight: false },
+                  { text: "Daily + on-demand scans", highlight: false },
+                  { text: "4 regional pricing sensors (US, EU, IN, Global)", highlight: true },
+                  { text: "AI tactical briefs", highlight: true },
+                  { text: "Visual snapshots for verification", highlight: true },
+                  { text: "Slack + Email alerts", highlight: true },
+                  { text: "Unlimited history", highlight: false },
                 ].map((item, i) => (
                   <li
                     key={i}
@@ -394,8 +399,8 @@ export default function Home() {
             <span className="text-emerald-400">Do you have a response?</span>
           </h2>
           <p className="text-lg text-muted-foreground mb-10 leading-relaxed max-w-xl mx-auto">
-            Every day you&apos;re not monitoring, you&apos;re flying blind.
-            Start free — it takes 30 seconds.
+            Every day you&apos;re not monitoring, your sales team is flying blind.
+            Start free — takes 30 seconds.
           </p>
           <Link href="/login">
             <Button size="lg" className="glow-emerald text-base px-10 py-8 gap-3">

@@ -8,9 +8,26 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY environment variable");
 }
 
+/**
+ * Client-side Supabase client
+ * 
+ * Configured with:
+ * - autoRefreshToken: true (automatically refresh tokens before expiry)
+ * - persistSession: true (store session in localStorage)
+ * - detectSessionInUrl: true (handle OAuth callbacks)
+ */
 export const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
+    {
+        auth: {
+            autoRefreshToken: true,
+            persistSession: true,
+            detectSessionInUrl: true,
+            storageKey: "rivaleye-auth",
+            flowType: "pkce",
+        },
+    }
 );
 
 // Server-side client with service role key (for API routes/server actions)
