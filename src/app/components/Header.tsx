@@ -16,22 +16,29 @@ export default function Header() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      // Use getUser() as it provides a more definitive check than getSession()
-      const { data: { user }, error } = await supabase.auth.getUser();
+      // First check session (faster, from localStorage)
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (error || !user) {
-        setUser(null);
-      } else {
-        setUser(user);
+      if (session?.user) {
+        setUser(session.user);
+        setIsLoading(false);
+        return;
       }
+
+      // Fallback to getUser if no session (validates with server)
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      setUser(authUser || null);
       setIsLoading(false);
     };
 
     checkAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_OUT" || event === "USER_UPDATED" && !session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Handle all relevant auth events
+      if (event === "SIGNED_OUT") {
         setUser(null);
+      } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+        setUser(session?.user || null);
       } else if (session?.user) {
         setUser(session.user);
       }

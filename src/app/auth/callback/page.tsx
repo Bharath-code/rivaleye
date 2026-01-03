@@ -2,20 +2,15 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 /**
  * Auth Callback Page
  *
- * Handles the redirect from Supabase magic link.
- * Supabase passes tokens in the URL hash, which must be handled client-side.
+ * Handles the redirect from Supabase magic link or OAuth.
+ * Uses the shared Supabase client to ensure PKCE code verifier is available.
  */
-
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
-);
 
 function AuthCallbackContent() {
     const router = useRouter();
