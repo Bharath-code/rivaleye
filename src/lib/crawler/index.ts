@@ -139,3 +139,22 @@ export { getGeoContextConfig, getExpectedCurrency, getCurrencySymbols } from "./
 export { decideScraper, isFirecrawlAvailable, shouldUpgradeToPlaywright } from "./decideScraper";
 export { uploadScreenshot, getScreenshotUrl, cleanupOldScreenshots } from "./screenshotStorage";
 
+// Vision-based pricing extraction (v3 - recommended for JS-heavy pricing pages)
+export { extractPricingWithVision, extractPricingMultiRegion, closeVisionBrowser } from "./visionPricing";
+
+// Branding/design system extraction (Pro feature)
+export { extractBranding, compareBranding } from "./brandingExtractor";
+export type { ExtractedBranding, BrandingDiff, BrandingChange } from "./brandingExtractor";
+
+// Tech stack detection (Pro feature)
+export { detectTechStack, compareTechStacks, closeTechStackBrowser } from "./techStackDetector";
+export type { DetectedTech, TechStackSummary, TechCategory, TechStackDiff } from "./techStackDetector";
+
+// Performance insights / Core Web Vitals (Pro feature)
+export { analyzePerformance, comparePerformance, closePerformanceBrowser } from "./performanceInsights";
+export type { PerformanceInsights, CoreWebVitals, PerformanceScore, PerformanceDiff } from "./performanceInsights";
+
+// Google PageSpeed Insights API (primary source)
+export { getPageSpeedInsights, getPerformanceGrade, getCoreWebVitalsStatus, isPSIKeyConfigured } from "./pageSpeedInsights";
+export type { PSIResult, PSICoreWebVitals, PSILighthouseAudit } from "./pageSpeedInsights";
+

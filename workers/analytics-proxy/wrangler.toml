@@ -1,0 +1,9 @@
+name = "rivaleye-analytics-proxy"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+
+# Route this to your domain's /ingress path
+# Example: rivaleye.com/ingress*
+# [[routes]]
+# pattern = "rivaleye.com/ingress*"
+# zone_name = "rivaleye.com"

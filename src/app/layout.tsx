@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Instrument_Serif, Space_Mono, Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
+import Script from "next/script";
 import "./globals.css";
 
 const instrumentSerif = Instrument_Serif({
@@ -40,14 +42,27 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const cfToken = process.env.NEXT_PUBLIC_CLOUDFLARE_BEACON_TOKEN;
+
   return (
     <html
       lang="en"
       className={`dark ${instrumentSerif.variable} ${spaceMono.variable} ${inter.variable}`}
     >
       <body className="bg-background text-foreground antialiased min-h-screen flex flex-col noise-overlay">
-        {children}
+        <AnalyticsProvider>
+          {children}
+        </AnalyticsProvider>
         <Toaster position="bottom-right" />
+
+        {/* Cloudflare Web Analytics */}
+        {cfToken && (
+          <Script
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon={JSON.stringify({ token: cfToken })}
+            strategy="afterInteractive"
+          />
+        )}
       </body>
     </html>
   );

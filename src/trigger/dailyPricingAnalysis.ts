@@ -1,6 +1,7 @@
 import { schedules, logger, metadata } from "@trigger.dev/sdk/v3";
 import { createClient } from "@supabase/supabase-js";
 import { checkPricingContext } from "./checkPricingContext";
+import { deepAuditTask } from "./deepAudit";
 import { crossRegionComparison } from "./crossRegionComparison";
 import { getFeatureFlags } from "@/lib/billing/featureFlags";
 import type { PricingContext, Competitor } from "@/lib/types";
@@ -175,8 +176,32 @@ export const dailyPricingAnalysis = schedules.task({
                 });
             }
 
+            // Step 5.5: Trigger Deep Audit for Pro users (once per competitor)
+            // We check if this is the first context in the workQueue for this competitor
+            const isFirstContextForCompetitor = workQueue.findIndex(w => w.competitorId === work.competitorId) === i;
+            if (isFirstContextForCompetitor) {
+                const competitorData = workByCompetitor.get(work.competitorId);
+                const flags = getFeatureFlags(competitorData?.plan as "free" | "pro" | "enterprise");
+
+                if (flags.canUseGeoAware) { // Pro check
+                    try {
+                        await deepAuditTask.trigger({
+                            competitorId: work.competitorId,
+                            competitorUrl: work.competitorUrl,
+                            competitorName: work.competitorName,
+                            userId: work.userId,
+                            userPlan: competitorData?.plan as "free" | "pro" | "enterprise" || "pro",
+                        });
+                        logger.info("Deep audit triggered", { competitor: work.competitorName });
+                    } catch (error) {
+                        logger.error("Failed to trigger deep audit", { competitor: work.competitorName, error });
+                    }
+                }
+            }
+
             // Rate limiting between checks
             await new Promise((r) => setTimeout(r, CONFIG.delayBetweenChecks));
+
         }
 
         // Step 6: Trigger cross-region comparison for Pro users

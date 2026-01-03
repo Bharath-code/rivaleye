@@ -1,0 +1,45 @@
+name: Deploy RivalEye Stack
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "workers/**"
+      - "src/trigger/**"
+      - ".github/workflows/deploy.yml"
+
+jobs:
+  deploy-cloudflare:
+    name: Deploy Analytics Proxy (Cloudflare)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: "workers/analytics-proxy"
+
+  deploy-trigger:
+    name: Deploy Tasks (Trigger.dev)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Deploy to Trigger.dev
+        run: npx trigger.dev@latest deploy --prod
+        env:
+          TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}

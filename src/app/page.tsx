@@ -217,23 +217,23 @@ export default function Home() {
               },
               {
                 icon: Shield,
-                title: "Freemium Gating",
-                desc: "High-priority alert when features move behind a paywall — a classic sign they're monetizing harder.",
+                title: "Tech Stack Shifts",
+                desc: "Get alerts when they add Stripe, Intercom, or move to Next.js. Semantic AI explains what their new stack means for their product roadmap.",
               },
               {
                 icon: Globe2,
                 title: "Geo-Pricing Gaps",
-                desc: "Uncover hidden discounts in India, Brazil, or EU that they're not advertising publicly.",
+                desc: "Uncover hidden discounts in India, Europe, or Global endpoints that hide localized strategies.",
               },
               {
                 icon: Sparkles,
-                title: "Strategic Context",
-                desc: "AI explains whether they're moving upmarket, cutting costs, or testing elasticity.",
+                title: "Branding Overhauls",
+                desc: "Detect potential rebrands via color, font, and logo changes before they launch. AI interprets the positioning shift.",
               },
               {
                 icon: Clock,
-                title: "Go-to-Market Shifts",
-                desc: "'Start Free' → 'Book a Demo' means they're pivoting to sales-led. You should know.",
+                title: "Core Web Vitals",
+                desc: "Monitor their performance. When their site slows down, capitalize on the UX gap. When they optimize, know they're scaling.",
               },
             ].map((feature, i) => (
               <div
@@ -345,21 +345,21 @@ export default function Home() {
               </div>
               <div className="font-mono text-[10px] text-emerald-400 mb-2 uppercase tracking-widest">Tactical Tier</div>
               <div className="text-4xl font-bold text-foreground mb-2">
-                $29
+                $49
                 <span className="text-lg font-normal text-muted-foreground">/mo</span>
               </div>
               <p className="text-sm text-muted-foreground mb-8">For scaling intelligence ops.</p>
 
               <ul className="space-y-4 text-sm mb-10">
                 {[
-                  { text: "5 competitors", highlight: false },
+                  { text: "10 competitors", highlight: false },
                   { text: "Unlimited pages per competitor", highlight: false },
                   { text: "Daily + on-demand scans", highlight: false },
                   { text: "4 regional pricing sensors (US, EU, IN, Global)", highlight: true },
-                  { text: "AI tactical briefs", highlight: true },
-                  { text: "Visual snapshots for verification", highlight: true },
+                  { text: "AI tactical briefs for every change", highlight: true },
+                  { text: "Tech Stack & Branding alerts", highlight: true },
+                  { text: "Core Web Vitals monitoring", highlight: true },
                   { text: "Slack + Email alerts", highlight: true },
-                  { text: "Unlimited history", highlight: false },
                 ].map((item, i) => (
                   <li
                     key={i}

@@ -41,8 +41,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-docs
+# docs
 .agent/
-supabase
+supabase/
 debug/
 migrations
+manual
+docs
