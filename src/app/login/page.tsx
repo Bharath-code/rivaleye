@@ -6,18 +6,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowLeft, Mail, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, Mail, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { Turnstile } from "@marsidev/react-turnstile";
+import { analytics } from "@/components/providers/AnalyticsProvider";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
+    const [turnstileVerified, setTurnstileVerified] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [socialLoading, setSocialLoading] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!turnstileVerified) {
+            setError("Please complete the security check.");
+            return;
+        }
+
         setIsSubmitting(true);
         setError(null);
 
@@ -35,12 +44,19 @@ export default function LoginPage() {
             return;
         }
 
+        analytics.signupCompleted('email');
         setIsSubmitted(true);
     };
 
     const handleSocialLogin = async (provider: "google" | "github") => {
+        if (!turnstileVerified) {
+            setError("Please complete the security check first.");
+            return;
+        }
+
         setSocialLoading(provider);
         setError(null);
+        analytics.signupStarted();
 
         const { error: authError } = await supabase.auth.signInWithOAuth({
             provider,
@@ -67,18 +83,28 @@ export default function LoginPage() {
 
             <Card className="w-full max-w-md glass-card">
                 <CardHeader className="text-center">
-                    <div className="w-12 h-12 rounded-lg bg-emerald-500 flex items-center justify-center mx-auto mb-4 glow-emerald">
+                    <div className="w-16 h-16 rounded-2xl bg-emerald-500 flex items-center justify-center mx-auto mb-6 glow-emerald shadow-2xl">
                         <svg
                             viewBox="0 0 24 24"
-                            className="w-6 h-6 text-background"
+                            className="w-8 h-8 text-background"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="2.5"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                         >
-                            <circle cx="12" cy="12" r="10" />
-                            <circle cx="12" cy="12" r="4" />
+                            {/* Outer Aperture - Asymmetrical */}
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10" strokeDasharray="4 2" />
+                            <path d="M22 12c0-5.52-4.48-10-10-10" />
+
+                            {/* Inner Focus */}
+                            <circle cx="12" cy="12" r="3" fill="currentColor" />
+
+                            {/* Tactical Crosshairs - Offset */}
+                            <line x1="12" y1="7" x2="12" y2="9" />
+                            <line x1="12" y1="15" x2="12" y2="17" />
+                            <line x1="7" y1="12" x2="9" y2="12" />
+                            <line x1="15" y1="12" x2="17" y2="12" />
                         </svg>
                     </div>
                     <CardTitle className="font-display text-2xl">
@@ -131,6 +157,17 @@ export default function LoginPage() {
                                 </p>
                             </div>
 
+                            {/* Cloudflare Turnstile */}
+                            <div className="flex justify-center py-2">
+                                <Turnstile
+                                    siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""}
+                                    onSuccess={() => setTurnstileVerified(true)}
+                                    onError={() => setTurnstileVerified(false)}
+                                    onExpire={() => setTurnstileVerified(false)}
+                                    options={{ theme: "dark" }}
+                                />
+                            </div>
+
                             {error && (
                                 <p className="text-sm text-red-500 text-center">{error}</p>
                             )}
@@ -138,7 +175,7 @@ export default function LoginPage() {
                             <Button
                                 type="submit"
                                 className="w-full"
-                                disabled={isSubmitting || !email}
+                                disabled={isSubmitting || !email || !turnstileVerified}
                             >
                                 {isSubmitting ? "Sending link..." : "Send Magic Link"}
                             </Button>
@@ -159,7 +196,7 @@ export default function LoginPage() {
                                     type="button"
                                     variant="outline"
                                     onClick={() => handleSocialLogin("google")}
-                                    disabled={socialLoading !== null}
+                                    disabled={socialLoading !== null || !turnstileVerified}
                                     className="gap-2"
                                 >
                                     {socialLoading === "google" ? (
@@ -190,7 +227,7 @@ export default function LoginPage() {
                                     type="button"
                                     variant="outline"
                                     onClick={() => handleSocialLogin("github")}
-                                    disabled={socialLoading !== null}
+                                    disabled={socialLoading !== null || !turnstileVerified}
                                     className="gap-2"
                                 >
                                     {socialLoading === "github" ? (

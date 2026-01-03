@@ -16,6 +16,7 @@ import { OnboardingWizard } from "@/components/onboarding";
 import type { PricingDiffType, AlertSeverity } from "@/lib/types";
 import { MarketRadar, PricingTrendChart } from "@/components/charts";
 import { cn } from "@/lib/utils";
+import { analytics } from "@/components/providers/AnalyticsProvider";
 
 interface Competitor {
     id: string;
@@ -140,6 +141,14 @@ export default function Dashboard() {
 
     useEffect(() => {
         fetchData();
+        // Track dashboard visit
+        const userCreatedAt = localStorage.getItem('userCreatedAt');
+        if (userCreatedAt) {
+            const daysSinceSignup = Math.floor((Date.now() - new Date(userCreatedAt).getTime()) / (1000 * 60 * 60 * 24));
+            analytics.dashboardVisit(daysSinceSignup);
+        } else {
+            analytics.dashboardVisit(0);
+        }
     }, [fetchData]);
 
     const handleAddCompetitor = async (e: React.FormEvent) => {
@@ -161,6 +170,7 @@ export default function Dashboard() {
             }
 
             setCompetitors((prev) => [data.competitor, ...prev]);
+            analytics.competitorAdded(competitors.length + 1);
             setIsAddingCompetitor(false);
             setCompetitorName("");
             setCompetitorUrl("");
@@ -234,6 +244,7 @@ export default function Dashboard() {
 
     const handleCheckNow = async (competitorId: string) => {
         setCheckingId(competitorId);
+        analytics.manualScanTriggered();
 
         try {
             const res = await fetch("/api/check-now", {

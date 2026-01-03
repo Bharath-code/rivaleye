@@ -180,7 +180,8 @@
   h2,
   h3,
   .font-display {
-    font-family: 'Instrument Serif', serif;
+    font-family: var(--font-display), system-ui, sans-serif;
+    letter-spacing: -0.02em;
   }
 
   code,
@@ -201,12 +202,14 @@
 
 .noise-overlay::before {
   content: '';
-  position: absolute;
+  position: fixed;
+  /* Promotes to its own layer, zero redraw on scroll */
   inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
   opacity: 0.03;
   pointer-events: none;
   z-index: 1;
+  will-change: opacity;
 }
 
 /* Dot Grid Background */
@@ -305,6 +308,37 @@
 }
 
 /* Focus States */
-.focus-ring {
-  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   SMOOTH SCROLL & REVEAL SYSTEM
+═══════════════════════════════════════════════════════════════════════════════ */
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* Base reveal state to prevent FOUC */
+.gsap-reveal {
+  opacity: 0;
+  visibility: hidden;
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
+  /* Force GPU acceleration */
 }

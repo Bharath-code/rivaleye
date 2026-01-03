@@ -1,7 +1,10 @@
+"use client";
+
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import { Button } from "@/components/ui/button";
 import { DemoAlertPreview } from "@/components/demo";
+import { HeroCTA, DemoCTA, PricingFreeCTA, PricingProCTA, FooterCTA } from "@/components/marketing/TrackedCTA";
 import Link from "next/link";
 import {
   Eye,
@@ -16,10 +19,66 @@ import {
   Clock,
   MapPin,
 } from "lucide-react";
+import { useRef } from "react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
+  const container = useRef(null);
+
+  useGSAP(() => {
+    // Reveal all sections on scroll
+    const reveals = gsap.utils.toArray(".gsap-reveal");
+
+    reveals.forEach((reveal: any) => {
+      gsap.fromTo(reveal,
+        {
+          opacity: 0,
+          y: 30,
+          visibility: "hidden"
+        },
+        {
+          opacity: 1,
+          y: 0,
+          visibility: "visible",
+          duration: 1,
+          ease: "power4.out",
+          scrollTrigger: {
+            trigger: reveal,
+            start: "top 85%",
+            toggleActions: "play none none none"
+          }
+        }
+      );
+    });
+
+    // Special staggered reveal for feature cards
+    gsap.fromTo(".feature-card",
+      {
+        opacity: 0,
+        y: 40,
+        visibility: "hidden"
+      },
+      {
+        opacity: 1,
+        y: 0,
+        visibility: "visible",
+        duration: 1,
+        stagger: 0.15,
+        ease: "power4.out",
+        scrollTrigger: {
+          trigger: ".features-grid",
+          start: "top 80%",
+        }
+      }
+    );
+  }, { scope: container });
+
   return (
-    <div className="flex-1 flex flex-col noise-overlay">
+    <div ref={container} className="flex-1 flex flex-col noise-overlay overflow-x-hidden">
       <Header />
 
       {/* Hero Section */}
@@ -27,53 +86,44 @@ export default function Home() {
         {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 via-transparent to-transparent pointer-events-none" />
 
-        <div className="max-w-5xl mx-auto text-center stagger-children relative">
+        <div className="max-w-5xl mx-auto text-center relative">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium mb-8 gsap-reveal">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Pricing Intelligence for Revenue Teams
+            Competitive Intel for SaaS Founders
           </div>
 
           {/* Headline */}
-          <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl text-foreground leading-[1.1] mb-6">
+          <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold text-foreground leading-[1.1] mb-6 gsap-reveal">
             Your competitors just changed pricing. <br />
-            <span className="text-emerald-400 italic">You knew 6 hours ago.</span>
+            <span className="text-emerald-400">You knew first.</span>
           </h1>
 
           {/* Subheadline */}
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-            RivalEye monitors competitor pricing pages across 4 global regions.
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed gsap-reveal">
+            RivalEye monitors competitor pricing, tech stack, and branding across 4 global regions.
             When they move, you get an <span className="text-foreground font-medium">AI tactical brief</span> — not just a notification.
           </p>
 
           {/* CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/login">
-              <Button size="lg" className="glow-emerald text-base px-8 py-6 gap-2">
-                Start Free — No Card Required
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href="#demo">
-              <Button variant="outline" size="lg" className="text-base px-8 py-6">
-                See a Live Alert
-              </Button>
-            </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 gsap-reveal">
+            <HeroCTA />
+            <DemoCTA />
           </div>
 
           {/* Trust Signal */}
-          <p className="text-sm text-muted-foreground mt-8">
+          <p className="text-sm text-muted-foreground mt-8 gsap-reveal">
             Free forever for 1 competitor • Setup in 30 seconds • No credit card
           </p>
         </div>
       </section>
 
       {/* Social Proof Bar */}
-      <section className="py-8 px-6 border-y border-border bg-muted/20">
+      <section className="py-8 px-6 border-y border-border bg-muted/20 gsap-reveal">
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-12 text-muted-foreground text-sm font-medium">
           <div className="flex items-center gap-2">
             <Check className="w-4 h-4 text-emerald-400" />
-            <span>Daily automated scans</span>
+            <span>Frequent automated scans</span>
           </div>
           <div className="flex items-center gap-2">
             <Globe2 className="w-4 h-4 text-emerald-400" />
@@ -93,7 +143,7 @@ export default function Home() {
       {/* The Problem */}
       <section className="py-20 px-6">
         <div className="max-w-4xl mx-auto">
-          <div className="glass-card rounded-2xl p-8 sm:p-12">
+          <div className="glass-card rounded-2xl p-8 sm:p-12 gsap-reveal">
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <div>
                 <h2 className="font-display text-3xl text-foreground mb-4">
@@ -178,7 +228,7 @@ export default function Home() {
       {/* Demo Alert Section */}
       <section id="demo" className="py-20 px-6 bg-muted/5">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
+          <div className="text-center mb-12 gsap-reveal">
             <h2 className="font-display text-3xl sm:text-4xl text-foreground mb-4">
               This is not a notification. It&apos;s a playbook.
             </h2>
@@ -187,14 +237,16 @@ export default function Home() {
             </p>
           </div>
 
-          <DemoAlertPreview variant="tactical" />
+          <div className="gsap-reveal">
+            <DemoAlertPreview variant="tactical" />
+          </div>
         </div>
       </section>
 
       {/* Features Grid */}
       <section id="features" className="py-20 px-6 border-t border-border">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
+          <div className="text-center mb-16 gsap-reveal">
             <h2 className="font-display text-4xl text-foreground mb-4">
               We catch what others miss.
             </h2>
@@ -203,7 +255,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 features-grid">
             {[
               {
                 icon: LineChart,
@@ -223,7 +275,7 @@ export default function Home() {
               {
                 icon: Globe2,
                 title: "Geo-Pricing Gaps",
-                desc: "Uncover hidden discounts in India, Europe, or Global endpoints that hide localized strategies.",
+                desc: "Uncover hidden discounts in India, Europe, or default pricing that reveal localized strategies.",
               },
               {
                 icon: Sparkles,
@@ -238,15 +290,15 @@ export default function Home() {
             ].map((feature, i) => (
               <div
                 key={i}
-                className="glass-card rounded-xl p-8 group hover:border-emerald-500/30 transition-all duration-300"
+                className="glass-card rounded-xl p-8 group hover:border-emerald-500/30 transition-all duration-300 hover:-translate-y-1 feature-card"
               >
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-6 group-hover:glow-emerald transition-shadow">
-                  <feature.icon className="w-6 h-6 text-emerald-400" />
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-6 group-hover:glow-emerald group-hover:scale-110 transition-all duration-300">
+                  <feature.icon className="w-6 h-6 text-emerald-400 group-hover:text-emerald-300 transition-colors duration-300" />
                 </div>
-                <h3 className="text-lg font-display text-foreground mb-2">
+                <h3 className="text-lg font-display text-foreground mb-2 group-hover:text-emerald-400 transition-colors duration-300">
                   {feature.title}
                 </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <p className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-300">
                   {feature.desc}
                 </p>
               </div>
@@ -258,7 +310,7 @@ export default function Home() {
       {/* Geo-Aware Section */}
       <section className="py-20 px-6 bg-muted/10">
         <div className="max-w-4xl mx-auto">
-          <div className="glass-card rounded-2xl p-8 sm:p-12 border-emerald-500/20 relative overflow-hidden">
+          <div className="glass-card rounded-2xl p-8 sm:p-12 border-emerald-500/20 relative overflow-hidden gsap-reveal">
             {/* Decorative lines */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl -mr-16 -mt-16" />
 
@@ -299,22 +351,22 @@ export default function Home() {
       {/* Pricing */}
       <section id="pricing" className="py-20 px-6 border-t border-border">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="font-display text-4xl text-foreground mb-4">
+          <h2 className="font-display text-4xl text-foreground mb-4 gsap-reveal">
             Strategic Investment.
           </h2>
-          <p className="text-muted-foreground mb-12">
+          <p className="text-muted-foreground mb-12 gsap-reveal">
             Pick the plan that fits your execution speed.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
             {/* Free */}
-            <div className="glass-card rounded-2xl p-8 text-left border-dashed">
+            <div className="glass-card rounded-2xl p-8 text-left border-dashed gsap-reveal">
               <div className="font-mono text-[10px] text-muted-foreground mb-2 uppercase tracking-widest">Recon Tier</div>
               <div className="text-4xl font-bold text-foreground mb-2">
                 $0
                 <span className="text-lg font-normal text-muted-foreground">/mo</span>
               </div>
-              <p className="text-sm text-muted-foreground mb-8">For early-stage founders.</p>
+              <p className="text-sm text-muted-foreground mb-8">For indie hackers testing the waters.</p>
 
               <ul className="space-y-4 text-sm text-muted-foreground mb-10">
                 {[
@@ -331,15 +383,11 @@ export default function Home() {
                 ))}
               </ul>
 
-              <Link href="/login" className="block">
-                <Button variant="outline" className="w-full h-12 text-base">
-                  Start Monitoring
-                </Button>
-              </Link>
+              <PricingFreeCTA />
             </div>
 
             {/* Pro */}
-            <div className="glass-card rounded-2xl p-8 text-left border-emerald-500/30 relative overflow-hidden saber-border">
+            <div className="glass-card rounded-2xl p-8 text-left border-emerald-500/30 relative overflow-hidden saber-border gsap-reveal">
               <div className="absolute top-0 right-0 bg-emerald-500 text-background text-[10px] font-bold px-4 py-1 rounded-bl-lg uppercase tracking-wider">
                 Recommended
               </div>
@@ -348,12 +396,11 @@ export default function Home() {
                 $49
                 <span className="text-lg font-normal text-muted-foreground">/mo</span>
               </div>
-              <p className="text-sm text-muted-foreground mb-8">For scaling intelligence ops.</p>
+              <p className="text-sm text-muted-foreground mb-8">For founders serious about competition.</p>
 
               <ul className="space-y-4 text-sm mb-10">
                 {[
-                  { text: "10 competitors", highlight: false },
-                  { text: "Unlimited pages per competitor", highlight: false },
+                  { text: "5 competitors", highlight: false },
                   { text: "Daily + on-demand scans", highlight: false },
                   { text: "4 regional pricing sensors (US, EU, IN, Global)", highlight: true },
                   { text: "AI tactical briefs for every change", highlight: true },
@@ -371,16 +418,12 @@ export default function Home() {
                 ))}
               </ul>
 
-              <Link href="/login" className="block">
-                <Button className="w-full h-12 text-base glow-emerald">
-                  Deploy Pro Sensors
-                </Button>
-              </Link>
+              <PricingProCTA />
             </div>
           </div>
 
           {/* Enterprise teaser */}
-          <div className="mt-12 p-6 rounded-xl bg-muted/20 border border-border inline-block">
+          <div className="mt-12 p-6 rounded-xl bg-muted/20 border border-border inline-block gsap-reveal">
             <p className="text-sm text-muted-foreground">
               Need more than 5 competitors?
               <a href="mailto:hello@rivaleye.app" className="text-emerald-400 hover:underline ml-2 font-medium">
@@ -393,7 +436,7 @@ export default function Home() {
 
       {/* Final CTA */}
       <section className="py-24 px-6">
-        <div className="max-w-3xl mx-auto text-center">
+        <div className="max-w-3xl mx-auto text-center gsap-reveal">
           <h2 className="font-display text-4xl sm:text-5xl text-foreground mb-6">
             Your competitors have a pricing strategy. <br />
             <span className="text-emerald-400">Do you have a response?</span>
@@ -402,12 +445,7 @@ export default function Home() {
             Every day you&apos;re not monitoring, your sales team is flying blind.
             Start free — takes 30 seconds.
           </p>
-          <Link href="/login">
-            <Button size="lg" className="glow-emerald text-base px-10 py-8 gap-3">
-              Deploy Your First Sensor
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-          </Link>
+          <FooterCTA />
         </div>
       </section>
 

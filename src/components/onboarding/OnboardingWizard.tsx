@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Check, Loader2, Sparkles, Target, Globe2, X } from "lucide-react";
+import { analytics } from "@/components/providers/AnalyticsProvider";
 
 interface OnboardingWizardProps {
     onComplete: (competitorUrl: string, competitorName: string) => Promise<void>;
@@ -50,6 +51,8 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
 
         try {
             await onComplete(url, name || new URL(url).hostname);
+            analytics.onboardingCompetitorAdded();
+            analytics.onboardingCompleted();
             setStep(3);
         } catch (err) {
             setError("Failed to add competitor. Please try again.");
@@ -165,8 +168,8 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                                             key={example.name}
                                             onClick={() => handleSelectExample(example)}
                                             className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${url === example.url
-                                                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
-                                                    : "border-border text-muted-foreground hover:border-emerald-500/30"
+                                                ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+                                                : "border-border text-muted-foreground hover:border-emerald-500/30"
                                                 }`}
                                         >
                                             {example.name}

@@ -1,97 +1,121 @@
-import { createClient } from "@supabase/supabase-js";
+import { S3Client, PutObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
 /**
- * Screenshot Storage Utility
+ * Cloudflare R2 Screenshot Storage Utility
  *
- * Uploads screenshots to Supabase Storage and returns public URLs.
- * Uses the 'screenshots' bucket configured in migration.
+ * Replaces Supabase Storage to achieve zero-egress costs and better performace.
+ * Uses the S3-compatible R2 API.
  */
 
-const BUCKET_NAME = "screenshots";
+const BUCKET_NAME = process.env.R2_BUCKET_NAME || "rivaleye-screenshots";
 
-function getSupabaseClient() {
-    return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-}
+// Configure S3 client for Cloudflare R2
+const s3 = new S3Client({
+    region: "auto",
+    endpoint: process.env.R2_ENDPOINT,
+    credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+    },
+});
 
 /**
- * Upload a screenshot to Supabase Storage.
- * Returns the storage path (not the public URL).
- *
- * Path format: screenshots/{competitor_id}/{context_key}/{timestamp}.webp
+ * Upload a screenshot to Cloudflare R2.
  */
 export async function uploadScreenshot(
     competitorId: string,
     contextKey: string,
     screenshot: Buffer
 ): Promise<{ success: true; path: string } | { success: false; error: string }> {
-    const supabase = getSupabaseClient();
-
     const timestamp = Date.now();
     const path = `${competitorId}/${contextKey}/${timestamp}.webp`;
 
-    const { error } = await supabase.storage
-        .from(BUCKET_NAME)
-        .upload(path, screenshot, {
-            contentType: "image/webp",
-            cacheControl: "31536000", // 1 year cache
-            upsert: false,
-        });
-
-    if (error) {
-        console.error("[Screenshot] Upload failed:", error.message);
+    try {
+        await s3.send(
+            new PutObjectCommand({
+                Bucket: BUCKET_NAME,
+                Key: path,
+                Body: screenshot,
+                ContentType: "image/webp",
+                CacheControl: "max-age=31536000", // 1 year cache
+            })
+        );
+        return { success: true, path };
+    } catch (error: any) {
+        console.error("[Screenshot] R2 Upload failed:", error.message);
         return { success: false, error: error.message };
     }
-
-    return { success: true, path };
 }
 
 /**
  * Get public URL for a screenshot.
+ * Incorporates Cloudflare Image Resizing if a custom domain or proxy is set up.
  */
-export function getScreenshotUrl(path: string): string {
-    const supabase = getSupabaseClient();
-    const { data } = supabase.storage.from(BUCKET_NAME).getPublicUrl(path);
-    return data.publicUrl;
+export function getScreenshotUrl(path: string, options?: { width?: number; quality?: number }): string {
+    const baseUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "";
+
+    // If no base URL is defined, we might need a presigned URL or public bucket access
+    if (!baseUrl) {
+        console.warn("[Screenshot] NEXT_PUBLIC_R2_PUBLIC_URL is not defined.");
+        return path; // Fallback to path
+    }
+
+    const url = new URL(`${baseUrl}/${path}`);
+
+    // Optional: Add Cloudflare Image Resizing parameters
+    // Note: This requires Cloudflare Images/Resizing to be enabled on the zone
+    if (options?.width) {
+        url.searchParams.set("width", options.width.toString());
+    }
+    if (options?.quality) {
+        url.searchParams.set("quality", options.quality.toString());
+    }
+    url.searchParams.set("format", "webp");
+
+    return url.toString();
 }
 
 /**
  * Delete old screenshots for a competitor/context.
- * Call periodically to manage storage costs.
  */
 export async function cleanupOldScreenshots(
     competitorId: string,
     contextKey: string,
     keepLast: number = 5
 ): Promise<void> {
-    const supabase = getSupabaseClient();
     const prefix = `${competitorId}/${contextKey}/`;
 
-    const { data: files, error } = await supabase.storage
-        .from(BUCKET_NAME)
-        .list(prefix, {
-            sortBy: { column: "created_at", order: "desc" },
+    try {
+        // List objects in the "folder"
+        const listCommand = new ListObjectsV2Command({
+            Bucket: BUCKET_NAME,
+            Prefix: prefix,
         });
 
-    if (error || !files) {
-        console.error("[Screenshot] Cleanup failed:", error?.message);
-        return;
-    }
+        const response = await s3.send(listCommand);
 
-    // Delete all files beyond the keepLast limit
-    const filesToDelete = files.slice(keepLast).map((f) => `${prefix}${f.name}`);
-
-    if (filesToDelete.length > 0) {
-        const { error: deleteError } = await supabase.storage
-            .from(BUCKET_NAME)
-            .remove(filesToDelete);
-
-        if (deleteError) {
-            console.error("[Screenshot] Delete failed:", deleteError.message);
-        } else {
-            console.log(`[Screenshot] Cleaned up ${filesToDelete.length} old screenshots`);
+        if (!response.Contents || response.Contents.length <= keepLast) {
+            return;
         }
+
+        // Sort by LastModified (newest first)
+        const sorted = response.Contents.sort((a, b) =>
+            (b.LastModified?.getTime() || 0) - (a.LastModified?.getTime() || 0)
+        );
+
+        // Files to delete (beyond the limit)
+        const toDelete = sorted.slice(keepLast).map(obj => ({ Key: obj.Key }));
+
+        if (toDelete.length > 0) {
+            await s3.send(
+                new DeleteObjectsCommand({
+                    Bucket: BUCKET_NAME,
+                    Delete: { Objects: toDelete as any },
+                })
+            );
+            console.log(`[Screenshot] Cleaned up ${toDelete.length} old screenshots from R2`);
+        }
+    } catch (error: any) {
+        console.error("[Screenshot] R2 Cleanup failed:", error.message);
     }
 }

@@ -58,8 +58,8 @@ export default function Header() {
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border glass-card">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 group">
-          {/* Logo */}
-          <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center shadow-lg glow-emerald transition-transform group-hover:scale-105">
+          {/* Logo: Sensor Mark */}
+          <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg glow-emerald transition-all duration-500 group-hover:scale-110 group-hover:rotate-[15deg]">
             <svg
               viewBox="0 0 24 24"
               className="w-5 h-5 text-background"
@@ -69,15 +69,21 @@ export default function Header() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <circle cx="12" cy="12" r="10" />
-              <circle cx="12" cy="12" r="4" />
-              <line x1="12" y1="2" x2="12" y2="6" />
-              <line x1="12" y1="18" x2="12" y2="22" />
-              <line x1="2" y1="12" x2="6" y2="12" />
-              <line x1="18" y1="12" x2="22" y2="12" />
+              {/* Outer Aperture - Asymmetrical */}
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10" strokeDasharray="4 2" />
+              <path d="M22 12c0-5.52-4.48-10-10-10" />
+
+              {/* Inner Focus */}
+              <circle cx="12" cy="12" r="3" fill="currentColor" />
+
+              {/* Tactical Crosshairs - Offset */}
+              <line x1="12" y1="7" x2="12" y2="9" />
+              <line x1="12" y1="15" x2="12" y2="17" />
+              <line x1="7" y1="12" x2="9" y2="12" />
+              <line x1="15" y1="12" x2="17" y2="12" />
             </svg>
           </div>
-          <span className="font-display text-xl text-foreground tracking-tight">
+          <span className="font-display text-2xl font-bold text-foreground tracking-tight transition-colors group-hover:text-emerald-400">
             RivalEye
           </span>
         </Link>

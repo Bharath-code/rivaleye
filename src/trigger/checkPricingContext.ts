@@ -4,7 +4,7 @@ import type { PricingContext, PricingSnapshot, PricingDiff, UserSettings } from 
 import { DEFAULT_USER_SETTINGS } from "@/lib/types";
 import { scrapeWithGeoContext, closeGeoBrowser } from "@/lib/crawler/geoPlaywright";
 import { decideScraper, getCurrencySymbols, shouldUpgradeToPlaywright } from "@/lib/crawler";
-import { uploadScreenshot } from "@/lib/crawler/screenshotStorage";
+import { uploadScreenshot, getScreenshotUrl } from "@/lib/crawler/screenshotStorage";
 import { diffPricing, type PricingDiffResult } from "@/lib/diff/pricingDiff";
 import { generatePricingInsight, generateFallbackInsight } from "@/lib/diff/pricingInsights";
 import { shouldTriggerAlert, formatAlertContent } from "@/lib/diff/alertRules";
@@ -264,18 +264,12 @@ export const checkPricingContext = task({
                         let previousScreenshotUrl: string | null = null;
 
                         if (screenshotPath) {
-                            const { data: publicData } = supabase.storage
-                                .from("screenshots")
-                                .getPublicUrl(screenshotPath);
-                            screenshotUrl = publicData?.publicUrl || null;
+                            screenshotUrl = getScreenshotUrl(screenshotPath, { width: 1200 });
                         }
 
                         // Get previous snapshot's screenshot if available
                         if (lastSnapshot?.screenshot_path) {
-                            const { data: prevPublicData } = supabase.storage
-                                .from("screenshots")
-                                .getPublicUrl(lastSnapshot.screenshot_path);
-                            previousScreenshotUrl = prevPublicData?.publicUrl || null;
+                            previousScreenshotUrl = getScreenshotUrl(lastSnapshot.screenshot_path, { width: 1200 });
                         }
 
                         await supabase.from("alerts").insert({

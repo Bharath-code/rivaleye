@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { DisclaimerFooter } from "./AlertList";
 import type { PricingDiffType, AlertSeverity } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CompetitiveResponseBrief } from "./CompetitiveResponseBrief";
+import { analytics } from "@/components/providers/AnalyticsProvider";
 
 /**
  * Alert Detail View
@@ -38,7 +39,8 @@ interface AlertDetailViewProps {
                 marketingAngle?: string;
             };
             screenshotPath?: string | null;
-            previousScreenshotPath?: string | null;
+            screenshotUrl?: string | null;
+            previousScreenshotUrl?: string | null;
         };
         is_read: boolean;
         created_at: string;
@@ -100,7 +102,15 @@ export function AlertDetailView({
 }: AlertDetailViewProps) {
     const config = severityConfig[alert.severity];
     const typeInfo = alertTypeLabels[alert.type];
-    const hasScreenshots = alert.details.screenshotPath || alert.details.previousScreenshotPath;
+    const hasScreenshots = alert.details.screenshotUrl || alert.details.previousScreenshotUrl;
+
+    // Track alert view on mount
+    useEffect(() => {
+        analytics.alertViewed(alert.id, alert.severity);
+        if (hasScreenshots) {
+            analytics.screenshotViewed();
+        }
+    }, [alert.id, alert.severity, hasScreenshots]);
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
@@ -181,14 +191,14 @@ export function AlertDetailView({
                 <CardContent>
                     {hasScreenshots ? (
                         <div className="grid grid-cols-2 gap-4">
-                            {alert.details.previousScreenshotPath && (
+                            {alert.details.previousScreenshotUrl && (
                                 <div className="space-y-2">
                                     <div className="text-sm font-medium text-muted-foreground">
                                         Before
                                     </div>
                                     <div className="relative aspect-[4/3] rounded-lg overflow-hidden border bg-muted">
                                         <Image
-                                            src={alert.details.previousScreenshotPath}
+                                            src={alert.details.previousScreenshotUrl || "/placeholder-screenshot.png"}
                                             alt="Before screenshot"
                                             fill
                                             className="object-cover object-top"
@@ -196,14 +206,14 @@ export function AlertDetailView({
                                     </div>
                                 </div>
                             )}
-                            {alert.details.screenshotPath && (
+                            {alert.details.screenshotUrl && (
                                 <div className="space-y-2">
                                     <div className="text-sm font-medium text-emerald-600">
                                         After
                                     </div>
                                     <div className="relative aspect-[4/3] rounded-lg overflow-hidden border-2 border-emerald-300 bg-muted">
                                         <Image
-                                            src={alert.details.screenshotPath}
+                                            src={alert.details.screenshotUrl}
                                             alt="After screenshot"
                                             fill
                                             className="object-cover object-top"
