@@ -117,15 +117,19 @@
   --popover-foreground: #F0F4F8;
   --primary: #10B981;
   /* Emerald - signals competitive insight */
-  --primary-foreground: #0A0E1A;
+  --primary-foreground: #000000;
+  /* Absolute Black for peak contrast on emerald */
   --secondary: #1E293B;
-  --secondary-foreground: #E2E8F0;
+  --secondary-foreground: #F1F5F9;
+  /* Brighter for better readability on navy */
   --muted: #1E293B;
-  --muted-foreground: #94A3B8;
+  --muted-foreground: #B0B0C4;
+  /* Improved contrast from #94A3B8 */
   --accent: #10B981;
-  --accent-foreground: #0A0E1A;
+  --accent-foreground: #000000;
   --destructive: #EF4444;
   --border: rgba(148, 163, 184, 0.1);
+  /* Subtler architectural border */
   --input: rgba(148, 163, 184, 0.15);
   --ring: #10B981;
   --chart-1: #10B981;
@@ -141,10 +145,10 @@
   --sidebar: #0F172A;
   --sidebar-foreground: #F0F4F8;
   --sidebar-primary: #10B981;
-  --sidebar-primary-foreground: #0A0E1A;
+  --sidebar-primary-foreground: #000000;
   --sidebar-accent: #1E293B;
   --sidebar-accent-foreground: #F0F4F8;
-  --sidebar-border: rgba(148, 163, 184, 0.1);
+  --sidebar-border: rgba(148, 163, 184, 0.08);
   --sidebar-ring: #10B981;
 
   /* RivalEye Extended Tokens */
@@ -154,6 +158,10 @@
   --color-emerald-dim: rgba(16, 185, 129, 0.1);
   --color-navy-light: #1E293B;
   --color-navy-mid: #111827;
+
+  /* Spatial System */
+  --space-unit: 0.5rem;
+
   --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
   --ease-elastic: cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }

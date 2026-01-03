@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, ExternalLink, RefreshCw, Clock, AlertCircle, CheckCircle2, Loader2, Sparkles, LineChart, History, Bell } from "lucide-react";
+import { Plus, ExternalLink, RefreshCw, Clock, AlertCircle, CheckCircle2, Loader2, Sparkles, LineChart, History, Bell, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -511,39 +511,39 @@ export default function Dashboard() {
                 <div className="max-w-6xl mx-auto">
                     {/* Dashboard Header */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
-                        <div>
-                            <div className="flex items-center gap-3 mb-1">
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-3">
                                 <h1 className="font-display text-4xl text-foreground">Dashboard</h1>
                                 <Badge variant={userPlan === "free" ? "outline" : "default"} className={cn(
-                                    "uppercase tracking-wider text-[10px]",
+                                    "uppercase tracking-wider text-[11px] px-2",
                                     userPlan === "pro" && "bg-emerald-500 text-black hover:bg-emerald-600 font-bold",
                                     userPlan === "enterprise" && "bg-purple-500 text-white hover:bg-purple-600 font-bold"
                                 )}>
                                     {userPlan}
                                 </Badge>
-                                <span className="text-xs text-muted-foreground font-mono bg-muted/30 px-2 py-1 rounded">
-                                    {competitors.length} / {userPlan === "free" ? 1 : userPlan === "pro" ? 5 : "10"} Competitors
+                                <span className="text-[11px] text-muted-foreground font-mono bg-muted/30 px-2 py-1 rounded-sm border border-border/50">
+                                    {competitors.length} / {userPlan === "free" ? 1 : userPlan === "pro" ? 5 : "10"} SLOTS
                                 </span>
                             </div>
-                            <p className="text-muted-foreground">
-                                Monitoring your competitors for changes.
+                            <p className="text-sm text-muted-foreground italic max-w-md">
+                                Market intelligence grid active. Monitoring {competitors.length} competitors for strategic shifts.
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
                             {userPlan === "free" && (
                                 <Button
                                     variant="outline"
-                                    className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 gap-2 relative overflow-hidden group saber-border h-9"
+                                    className="border-white/10 text-white/90 hover:bg-white/5 hover:text-white gap-2 relative h-10 transition-all font-medium"
                                     onClick={() => router.push("/#pricing")}
                                 >
-                                    <Sparkles className="w-4 h-4" />
+                                    <Sparkles className="w-4 h-4 text-emerald-400" />
                                     Upgrade to Pro
                                 </Button>
                             )}
                             <Dialog open={isAddingCompetitor} onOpenChange={setIsAddingCompetitor}>
                                 <DialogTrigger asChild>
-                                    <Button className="glow-emerald gap-2">
-                                        <Plus className="w-4 h-4" />
+                                    <Button variant="glow-emerald" className="gap-2 h-10 px-5">
+                                        <Plus className="w-4 h-4 stroke-[3px]" />
                                         Add Competitor
                                     </Button>
                                 </DialogTrigger>
@@ -628,26 +628,29 @@ export default function Dashboard() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                                     <MarketRadar entities={radarData} className="aspect-square max-w-[400px] mx-auto" />
                                     <div className="space-y-4">
-                                        <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
-                                            <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Strategic Insight</h4>
-                                            <p className="text-sm leading-relaxed">
+                                        <div className="p-5 bg-white/[0.03] rounded-xl border border-white/5 backdrop-blur-sm shadow-inner">
+                                            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-400 mb-3 flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                Strategic Insight
+                                            </h4>
+                                            <p className="text-[13px] leading-relaxed text-slate-200 font-medium">
                                                 {radarData.length > 2 ? (
-                                                    "Your competitors are primarily clustered in the center. There's a clear 'Disruptor' white space in the top-left quadrant for a high-feature, mid-price offering."
+                                                    "Competitive clustering detected in mid-market. Clear disruptor white-space exists in high-feature, low-price quadrant."
                                                 ) : (
-                                                    "Add more competitors to unlock full quadrant analysis and spot market entry opportunities."
+                                                    "Aggregating data points. Add 2 more competitors to activate high-fidelity quadrant analysis."
                                                 )}
                                             </p>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="text-center p-3 border rounded-lg bg-surface">
-                                                <div className="text-2xl font-display text-blue-400">{radarData.length}</div>
-                                                <div className="text-[10px] uppercase text-muted-foreground">Competitors Mapped</div>
+                                            <div className="text-center p-4 border border-white/5 rounded-xl bg-white/[0.01] hover:bg-white/[0.03] transition-colors group">
+                                                <div className="text-3xl font-display text-white group-hover:text-emerald-400 transition-colors">{radarData.length}</div>
+                                                <div className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mt-1">Nodes Mapped</div>
                                             </div>
-                                            <div className="text-center p-3 border rounded-lg bg-surface">
-                                                <div className="text-2xl font-display text-emerald-400">
+                                            <div className="text-center p-4 border border-white/5 rounded-xl bg-white/[0.01] hover:bg-white/[0.03] transition-colors group">
+                                                <div className="text-3xl font-display text-white group-hover:text-emerald-400 transition-colors">
                                                     {radarData.length > 0 ? (radarData.reduce((acc, curr) => acc + curr.featureDensity, 0) / radarData.length).toFixed(1) : "0"}
                                                 </div>
-                                                <div className="text-[10px] uppercase text-muted-foreground">Avg Feature Score</div>
+                                                <div className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mt-1">Avg Efficiency</div>
                                             </div>
                                         </div>
                                     </div>
@@ -679,19 +682,26 @@ export default function Dashboard() {
                                                 </svg>
                                             </div>
 
-                                            <div className="relative z-10">
-                                                <div className="w-16 h-16 rounded-full bg-muted/30 border border-muted/50 flex items-center justify-center mx-auto mb-6">
-                                                    <Plus className="w-8 h-8 text-muted-foreground/30" />
+                                            <div className="relative z-20 flex flex-col items-center justify-center py-20 text-center">
+                                                <div className="relative mb-8">
+                                                    <div className="absolute inset-0 bg-emerald-500/20 blur-3xl rounded-full" />
+                                                    <div className="relative w-20 h-20 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center rotate-3 hover:rotate-0 transition-transform duration-500 shadow-2xl">
+                                                        <Plus className="w-10 h-10 text-emerald-400/50" />
+                                                    </div>
                                                 </div>
-                                                <h3 className="text-base font-display text-foreground mb-2">Build Your Intelligence Grid</h3>
-                                                <p className="text-sm text-muted-foreground max-w-[240px] mx-auto mb-8 leading-relaxed">
-                                                    Add your first competitor to begin mapping the market landscape.
+
+                                                <h3 className="font-display text-3xl text-white mb-3">Build Your Intelligence Grid</h3>
+                                                <p className="text-sm text-muted-foreground max-w-[280px] mb-10 leading-relaxed font-medium">
+                                                    Initialize market monitoring by adding your first competitor to the observation matrix.
                                                 </p>
+
                                                 <Button
-                                                    className="glow-emerald"
+                                                    variant="glow-emerald"
+                                                    className="h-11 px-8 rounded-xl"
                                                     onClick={() => setIsAddingCompetitor(true)}
                                                 >
-                                                    Initialize Monitoring
+                                                    <Plus className="w-4 h-4 mr-2 stroke-[3px]" />
+                                                    Add First Competitor
                                                 </Button>
                                             </div>
                                         </CardContent>
@@ -751,32 +761,35 @@ export default function Dashboard() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-2 mt-4">
+                                                <div className="grid grid-cols-2 gap-3 mt-5">
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        className="text-xs h-8 bg-surface-elevated/50 flex items-center gap-2 group hover:border-emerald-500/30"
+                                                        className="text-xs h-9 bg-white/[0.02] border-white/5 flex items-center gap-2 group hover:bg-white/5 hover:border-white/10 text-white/80 hover:text-white transition-all duration-300"
                                                         onClick={() => handleCheckNow(competitor.id)}
                                                         disabled={checkingId === competitor.id}
                                                     >
                                                         {checkingId === competitor.id ? (
-                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                                         ) : (
-                                                            <RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />
+                                                            <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
                                                         )}
                                                         Check
                                                     </Button>
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        className="text-xs h-8 bg-emerald-500/5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10"
+                                                        className="text-xs h-9 bg-emerald-500/[0.03] border-emerald-500/10 text-emerald-400/90 hover:bg-emerald-500 hover:text-black hover:border-emerald-500 transition-all duration-300 font-medium"
                                                         onClick={() => handleAnalyze(competitor.id)}
                                                         disabled={analyzingId === competitor.id}
                                                     >
                                                         {analyzingId === competitor.id ? (
-                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                                         ) : (
-                                                            <span>Analyze</span>
+                                                            <span className="flex items-center gap-1.5">
+                                                                <Sparkles className="w-3.5 h-3.5" />
+                                                                Analyze
+                                                            </span>
                                                         )}
                                                     </Button>
                                                 </div>

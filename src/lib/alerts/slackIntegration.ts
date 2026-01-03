@@ -12,12 +12,13 @@ export async function pushToSlack(payload: {
     playbook?: {
         salesDraft?: string;
     };
+    webhookUrl?: string; // Custom webhook URL (per-user)
 }) {
-    const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+    const webhookUrl = payload.webhookUrl || process.env.SLACK_WEBHOOK_URL;
 
     if (!webhookUrl) {
         console.warn("[Slack] No webhook URL configured.");
-        return { success: false, error: "SLACK_WEBHOOK_URL not configured" };
+        return { success: false, error: "No Slack webhook URL configured" };
     }
 
     const slackPayload = {

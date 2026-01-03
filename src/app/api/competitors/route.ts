@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { getUserId, getCurrentUser } from "@/lib/auth";
+import { analyzeCompetitorTask } from "@/trigger/analyzeCompetitor";
 
 /**
  * Competitors API
@@ -154,8 +155,19 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Failed to create competitor" }, { status: 500 });
         }
 
-        // TODO: Trigger first crawl asynchronously
-        // await triggerCrawl(competitor.id);
+        // Trigger first crawl asynchronously (fire-and-forget)
+        try {
+            await analyzeCompetitorTask.trigger({
+                competitorId: competitor.id,
+                competitorUrl: competitor.url,
+                competitorName: competitor.name,
+                userId,
+            });
+            console.log(`[Competitors] Triggered first analysis for ${competitor.name}`);
+        } catch (triggerError) {
+            // Non-blocking: log but don't fail the request
+            console.error("Failed to trigger first analysis:", triggerError);
+        }
 
         return NextResponse.json({ competitor }, { status: 201 });
     } catch (error) {

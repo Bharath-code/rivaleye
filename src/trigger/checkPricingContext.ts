@@ -1,12 +1,15 @@
 import { task, logger, metadata } from "@trigger.dev/sdk/v3";
 import { createClient } from "@supabase/supabase-js";
-import type { PricingContext, PricingSnapshot, PricingDiff } from "@/lib/types";
+import type { PricingContext, PricingSnapshot, PricingDiff, UserSettings } from "@/lib/types";
+import { DEFAULT_USER_SETTINGS } from "@/lib/types";
 import { scrapeWithGeoContext, closeGeoBrowser } from "@/lib/crawler/geoPlaywright";
 import { decideScraper, getCurrencySymbols, shouldUpgradeToPlaywright } from "@/lib/crawler";
 import { uploadScreenshot } from "@/lib/crawler/screenshotStorage";
 import { diffPricing, type PricingDiffResult } from "@/lib/diff/pricingDiff";
 import { generatePricingInsight, generateFallbackInsight } from "@/lib/diff/pricingInsights";
 import { shouldTriggerAlert, formatAlertContent } from "@/lib/diff/alertRules";
+import { sendAlertEmail } from "@/lib/alerts/sendEmail";
+import { pushToSlack } from "@/lib/alerts/slackIntegration";
 
 /**
  * Check Pricing Context Task
@@ -95,14 +98,19 @@ export const checkPricingContext = task({
 
             logger.info(`Using scraper: ${scraperType}`, { reason: context.requires_browser ? "geo-context" : "fallback" });
 
-            // Step 3: Fetch user plan and flags
+            // Step 3: Fetch user plan, email, settings, and flags
             const { data: userRecord } = await supabase
                 .from("users")
-                .select("plan")
+                .select("plan, email, settings")
                 .eq("id", userId)
                 .single();
 
             const userPlan = (userRecord?.plan || "free") as "free" | "pro" | "enterprise";
+            const userEmail = userRecord?.email as string | null;
+            const userSettings: UserSettings = {
+                ...DEFAULT_USER_SETTINGS,
+                ...(userRecord?.settings || {}),
+            };
             const { getFeatureFlags } = await import("@/lib/billing/featureFlags");
             const flags = getFeatureFlags(userPlan);
 
@@ -288,6 +296,47 @@ export const checkPricingContext = task({
                                 previousScreenshotUrl,
                             },
                         });
+
+                        // Send real-time email notification (if enabled)
+                        if (userEmail && userSettings.email_enabled && userSettings.digest_frequency === "instant") {
+                            try {
+                                await sendAlertEmail({
+                                    to: userEmail,
+                                    competitorName,
+                                    pageUrl: competitorUrl,
+                                    insight: {
+                                        whatChanged: diff.description,
+                                        whyItMatters: aiExplanation || `${competitorName} made a ${diff.type.replace(/_/g, " ")} change.`,
+                                        whatToDo: tacticalPlaybook?.recommendedAction || "Review the change and assess impact on your strategy.",
+                                        confidence: alertDecision.severity === "high" ? "high" : "medium",
+                                    },
+                                });
+                                logger.info("Email notification sent", { to: userEmail });
+                            } catch (emailError) {
+                                logger.error("Failed to send email notification", { error: emailError });
+                            }
+                        } else if (userSettings.digest_frequency !== "instant") {
+                            logger.info("Skipping email (digest mode)", { frequency: userSettings.digest_frequency });
+                        } else if (!userSettings.email_enabled) {
+                            logger.info("Skipping email (disabled by user)");
+                        }
+
+                        // Send to Slack (if configured)
+                        if (userSettings.slack_webhook_url) {
+                            try {
+                                await pushToSlack({
+                                    title: alertContent.headline,
+                                    description: alertContent.body,
+                                    competitorName,
+                                    link: `${process.env.NEXT_PUBLIC_APP_URL || "https://rivaleye.com"}/dashboard`,
+                                    playbook: tacticalPlaybook,
+                                    webhookUrl: userSettings.slack_webhook_url,
+                                });
+                                logger.info("Slack notification sent");
+                            } catch (slackError) {
+                                logger.error("Failed to send Slack notification", { error: slackError });
+                            }
+                        }
 
                         alertCreated = true;
                         logger.info("Alert created", {

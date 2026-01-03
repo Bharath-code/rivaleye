@@ -80,29 +80,29 @@ export function CompactAlertCard({
     return (
         <Card
             className={cn(
-                "relative border-l-4 transition-all duration-200 cursor-pointer hover:bg-accent/50",
+                "relative border-l-4 transition-all duration-300 cursor-pointer hover:bg-white/[0.04] hover:translate-x-0.5 active:scale-[0.99]",
                 config.border,
-                !isRead && "bg-muted/30"
+                !isRead ? "bg-emerald-500/[0.03] border-border/50" : "bg-transparent opacity-80"
             )}
             onClick={onClick}
         >
-            <CardContent className="py-3 px-4">
+            <CardContent className="py-3.5 px-4">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1.5">
                             {!isRead && (
-                                <div className={cn("w-2 h-2 rounded-full shrink-0", config.dot)} />
+                                <div className={cn("w-2 h-2 rounded-full shrink-0 animate-pulse", config.dot)} />
                             )}
-                            <Badge variant="outline" className={cn("text-[10px] px-1.5", config.badge)}>
+                            <Badge variant="outline" className={cn("text-[11px] px-2 font-mono tracking-tight", config.badge)}>
                                 {emoji} {severity.toUpperCase()}
                             </Badge>
-                            <span className="text-xs text-muted-foreground truncate">
+                            <span className="text-[11px] font-bold text-foreground/70 uppercase tracking-widest truncate">
                                 {competitorName}
                             </span>
                         </div>
-                        <p className="text-sm font-medium truncate">{title}</p>
+                        <p className="text-[13px] font-medium text-foreground leading-relaxed truncate">{title}</p>
                     </div>
-                    <span className="text-[10px] text-muted-foreground shrink-0">
+                    <span className="text-[10px] font-mono text-muted-foreground shrink-0 mt-1">
                         {getTimeAgo(new Date(createdAt))}
                     </span>
                 </div>
@@ -216,7 +216,7 @@ export function DashboardAlertSummary({
 
             {/* View All Button */}
             {alerts.length > 0 && (
-                <Button variant="outline" className="w-full" onClick={onViewAll}>
+                <Button variant="outline" className="w-full border-white/5 bg-white/[0.02] text-white/70 hover:bg-emerald-500 hover:text-black hover:border-emerald-500 transition-all duration-300 h-10 font-medium" onClick={onViewAll}>
                     View All Alerts ({alerts.length})
                 </Button>
             )}

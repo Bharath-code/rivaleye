@@ -2,15 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { useRouter, usePathname } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Loader2, LogOut, LayoutDashboard } from "lucide-react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
-);
+import { Loader2, LogOut, LayoutDashboard, Settings as SettingsIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function Header() {
   const router = useRouter();
@@ -20,15 +16,25 @@ export default function Header() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+      // Use getUser() as it provides a more definitive check than getSession()
+      const { data: { user }, error } = await supabase.auth.getUser();
+
+      if (error || !user) {
+        setUser(null);
+      } else {
+        setUser(user);
+      }
       setIsLoading(false);
     };
 
     checkAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_OUT" || event === "USER_UPDATED" && !session) {
+        setUser(null);
+      } else if (session?.user) {
+        setUser(session.user);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -73,25 +79,40 @@ export default function Header() {
           {isLoading ? (
             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground mr-4" />
           ) : user ? (
-            <>
+            <div className="flex items-center gap-2">
               {pathname !== "/dashboard" && (
                 <Link href="/dashboard">
-                  <Button variant="ghost" size="sm" className="gap-2">
+                  <Button variant="ghost" size="sm" className="gap-2 h-9">
                     <LayoutDashboard className="w-4 h-4" />
-                    Dashboard
+                    <span className="hidden md:inline">Dashboard</span>
                   </Button>
                 </Link>
               )}
+
+              <Link href="/settings">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "w-9 h-9 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors border border-transparent",
+                    pathname === "/settings" && "text-emerald-400 bg-white/5 border-white/5"
+                  )}
+                  title="Settings"
+                >
+                  <SettingsIcon className="w-4.5 h-4.5" />
+                </Button>
+              </Link>
+
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground hover:text-red-400 gap-2"
+                className="text-muted-foreground hover:text-red-400 gap-2 h-9"
                 onClick={handleLogout}
               >
                 <LogOut className="w-4 h-4" />
                 <span className="hidden sm:inline">Sign Out</span>
               </Button>
-            </>
+            </div>
           ) : (
             <>
               <Link

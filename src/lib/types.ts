@@ -2,6 +2,18 @@
 // RIVALEYE TYPES
 // ══════════════════════════════════════════════════════════════════════════════
 
+export interface UserSettings {
+    email_enabled: boolean;
+    digest_frequency: "instant" | "daily" | "weekly";
+    slack_webhook_url: string | null;
+}
+
+export const DEFAULT_USER_SETTINGS: UserSettings = {
+    email_enabled: true,
+    digest_frequency: "instant",
+    slack_webhook_url: null,
+};
+
 export interface User {
     id: string;
     email: string;
@@ -13,6 +25,7 @@ export interface User {
     crawls_today: number;
     manual_checks_today: number;
     last_quota_reset: string;
+    settings: UserSettings;
     created_at: string;
 }
 export interface Competitor {
