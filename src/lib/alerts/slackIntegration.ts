@@ -4,6 +4,8 @@
  * Simple utility to push formatted alerts to Slack.
  */
 
+import { decryptWebhookUrl } from "@/lib/encryption";
+
 export async function pushToSlack(payload: {
     title: string;
     description: string;
@@ -12,9 +14,12 @@ export async function pushToSlack(payload: {
     playbook?: {
         salesDraft?: string;
     };
-    webhookUrl?: string; // Custom webhook URL (per-user)
+    webhookUrl?: string; // Custom webhook URL (per-user, may be encrypted)
 }) {
-    const webhookUrl = payload.webhookUrl || process.env.SLACK_WEBHOOK_URL;
+    // Decrypt webhook URL if it's encrypted
+    let webhookUrl = payload.webhookUrl
+        ? decryptWebhookUrl(payload.webhookUrl)
+        : process.env.SLACK_WEBHOOK_URL;
 
     if (!webhookUrl) {
         console.warn("[Slack] No webhook URL configured.");

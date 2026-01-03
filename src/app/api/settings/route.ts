@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase";
 import { getUserId } from "@/lib/auth";
 import type { UserSettings } from "@/lib/types";
 import { DEFAULT_USER_SETTINGS } from "@/lib/types";
+import { encryptWebhookUrl, decryptWebhookUrl } from "@/lib/encryption";
 
 /**
  * Settings API
@@ -40,6 +41,13 @@ export async function GET() {
             ...(user?.settings || {}),
         };
 
+        // Decrypt webhook URL for client display (masked)
+        if (settings.slack_webhook_url) {
+            const decrypted = decryptWebhookUrl(settings.slack_webhook_url);
+            // Return masked version for security
+            settings.slack_webhook_url = decrypted ? "••••••••" + decrypted.slice(-20) : null;
+        }
+
         return NextResponse.json({ settings });
     } catch (error) {
         console.error("Unexpected error:", error);
@@ -72,7 +80,15 @@ export async function PATCH(request: NextRequest) {
             if (body.slack_webhook_url === null || body.slack_webhook_url === "") {
                 updates.slack_webhook_url = null;
             } else if (typeof body.slack_webhook_url === "string" && body.slack_webhook_url.startsWith("https://hooks.slack.com/")) {
-                updates.slack_webhook_url = body.slack_webhook_url;
+                // Encrypt the webhook URL before storing
+                const encrypted = encryptWebhookUrl(body.slack_webhook_url);
+                if (!encrypted) {
+                    return NextResponse.json(
+                        { error: "Failed to secure webhook URL. Please try again." },
+                        { status: 500 }
+                    );
+                }
+                updates.slack_webhook_url = encrypted;
             } else {
                 return NextResponse.json(
                     { error: "Invalid Slack webhook URL. Must start with https://hooks.slack.com/" },

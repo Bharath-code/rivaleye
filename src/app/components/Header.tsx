@@ -98,6 +98,7 @@ export default function Header() {
                     pathname === "/settings" && "text-emerald-400 bg-white/5 border-white/5"
                   )}
                   title="Settings"
+                  aria-label="Open notification settings"
                 >
                   <SettingsIcon className="w-4.5 h-4.5" />
                 </Button>

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, ExternalLink, RefreshCw, Clock, AlertCircle, CheckCircle2, Loader2, Sparkles, LineChart, History, Bell, Settings } from "lucide-react";
+import { Plus, ExternalLink, RefreshCw, Clock, AlertCircle, CheckCircle2, Loader2, Sparkles, LineChart, History, Bell, Settings, Pencil, Trash2, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -85,6 +85,13 @@ export default function Dashboard() {
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
     const [historyChartData, setHistoryChartData] = useState<any[]>([]);
     const [showOnboarding, setShowOnboarding] = useState(false);
+
+    // Edit competitor state
+    const [editingCompetitor, setEditingCompetitor] = useState<Competitor | null>(null);
+    const [editName, setEditName] = useState("");
+    const [editUrl, setEditUrl] = useState("");
+    const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+    const [editError, setEditError] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
         try {
@@ -322,6 +329,64 @@ export default function Dashboard() {
             setAnalyzingId(null);
         }
     };
+
+    // Edit competitor handler
+    const handleEditCompetitor = async () => {
+        if (!editingCompetitor) return;
+
+        setIsEditSubmitting(true);
+        setEditError(null);
+
+        try {
+            const res = await fetch(`/api/competitors/${editingCompetitor.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: editName !== editingCompetitor.name ? editName : undefined,
+                    url: editUrl !== editingCompetitor.url ? editUrl : undefined,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                setEditError(data.error || "Failed to update competitor");
+                return;
+            }
+
+            // Update local state
+            setCompetitors((prev) =>
+                prev.map((c) =>
+                    c.id === editingCompetitor.id ? data.competitor : c
+                )
+            );
+
+            // Show success message
+            const message = data.historyReset
+                ? `✓ ${data.competitor.name} updated. Historical data has been reset.`
+                : `✓ ${data.competitor.name} updated successfully.`;
+            setCheckSuccess(message);
+            setTimeout(() => setCheckSuccess(null), 5000);
+
+            // Close dialog
+            setEditingCompetitor(null);
+            setEditName("");
+            setEditUrl("");
+        } catch (err) {
+            setEditError(err instanceof Error ? err.message : "Failed to update competitor");
+        } finally {
+            setIsEditSubmitting(false);
+        }
+    };
+
+    const openEditDialog = (competitor: Competitor) => {
+        setEditingCompetitor(competitor);
+        setEditName(competitor.name);
+        setEditUrl(competitor.url);
+        setEditError(null);
+    };
+
+    const urlIsChanging = editingCompetitor && editUrl !== editingCompetitor.url;
 
     if (isLoading) {
         return (
@@ -724,8 +789,19 @@ export default function Dashboard() {
                                                             className="w-7 h-7 text-muted-foreground hover:text-emerald-400"
                                                             onClick={() => handleViewHistory(competitor)}
                                                             title="View History"
+                                                            aria-label={`View pricing history for ${competitor.name}`}
                                                         >
                                                             <LineChart className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="w-7 h-7 text-muted-foreground hover:text-blue-400"
+                                                            onClick={() => openEditDialog(competitor)}
+                                                            title="Edit Competitor"
+                                                            aria-label={`Edit ${competitor.name}`}
+                                                        >
+                                                            <Pencil className="w-3.5 h-3.5" />
                                                         </Button>
                                                         <Button
                                                             variant="ghost"
@@ -733,6 +809,7 @@ export default function Dashboard() {
                                                             className="w-7 h-7 text-muted-foreground hover:text-foreground"
                                                             onClick={() => window.open(competitor.url, "_blank")}
                                                             title="Direct Link"
+                                                            aria-label={`Open ${competitor.name} website in new tab`}
                                                         >
                                                             <ExternalLink className="w-4 h-4" />
                                                         </Button>
@@ -867,6 +944,84 @@ export default function Dashboard() {
                     <div className="flex justify-end pt-4">
                         <Button variant="outline" onClick={() => setSelectedHistoryComp(null)}>Close Analysis</Button>
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Competitor Dialog */}
+            <Dialog open={!!editingCompetitor} onOpenChange={(open) => !open && setEditingCompetitor(null)}>
+                <DialogContent className="sm:max-w-md glass-card">
+                    <DialogHeader>
+                        <DialogTitle className="font-display text-xl">Edit Competitor</DialogTitle>
+                        <DialogDescription>
+                            Update competitor details. Changing the URL will reset all historical data.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={(e) => { e.preventDefault(); handleEditCompetitor(); }} className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-name">Competitor Name</Label>
+                            <Input
+                                id="edit-name"
+                                placeholder="e.g. Acme Corp"
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-url">Page URL</Label>
+                            <Input
+                                id="edit-url"
+                                type="url"
+                                placeholder="https://acme.com/pricing"
+                                value={editUrl}
+                                onChange={(e) => setEditUrl(e.target.value)}
+                                required
+                            />
+                        </div>
+
+                        {/* URL Change Warning */}
+                        {urlIsChanging && (
+                            <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-sm font-medium text-amber-500">Historical data will be reset</p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Changing the URL will delete all snapshots and alerts for this competitor.
+                                        This ensures data integrity for the new target.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {editError && (
+                            <p className="text-sm text-red-500">{editError}</p>
+                        )}
+
+                        <div className="flex gap-3 pt-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setEditingCompetitor(null)}
+                                className="flex-1"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant={urlIsChanging ? "destructive" : "default"}
+                                disabled={isEditSubmitting || (!editName && !editUrl)}
+                                className={cn("flex-1", !urlIsChanging && "glow-emerald")}
+                            >
+                                {isEditSubmitting ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : urlIsChanging ? (
+                                    "Save & Reset History"
+                                ) : (
+                                    "Save Changes"
+                                )}
+                            </Button>
+                        </div>
+                    </form>
                 </DialogContent>
             </Dialog>
         </div>
