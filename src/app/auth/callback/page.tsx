@@ -61,6 +61,25 @@ function AuthCallbackContent() {
                             refreshToken: session.refresh_token,
                         }),
                     });
+
+                    // ── Email Verification Safety Check ──────────────────────────
+                    // Check if email is verified for OAuth providers
+                    // This is important for safe account linking across providers
+                    const user = session.user;
+                    const provider = user.app_metadata?.provider;
+                    const emailVerified = user.email_confirmed_at || user.user_metadata?.email_verified;
+
+                    if (provider && provider !== "email" && !emailVerified) {
+                        console.warn(
+                            `[Auth] OAuth login from ${provider} - email "${user.email}" may not be verified. ` +
+                            "This could be a security concern if auto-linking is enabled."
+                        );
+                    }
+
+                    console.log(
+                        `[Auth] Session established: ${user.email} via ${provider || "email"} ` +
+                        `(verified: ${!!emailVerified})`
+                    );
                 }
 
                 setStatus("success");
