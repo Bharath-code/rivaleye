@@ -77,7 +77,7 @@ export default function Dashboard() {
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [checkingId, setCheckingId] = useState<string | null>(null);
+    // checkingId removed - merged into analyzingId
     const [checkSuccess, setCheckSuccess] = useState<string | null>(null);
     const [userPlan, setUserPlan] = useState<"free" | "pro" | "enterprise">("free");
     const [radarData, setRadarData] = useState<any[]>([]);
@@ -242,50 +242,8 @@ export default function Dashboard() {
         }
     };
 
-    const handleCheckNow = async (competitorId: string) => {
-        setCheckingId(competitorId);
-        analytics.manualScanTriggered();
+    // handleCheckNow removed - merged into handleAnalyze (vision-based scan)
 
-        try {
-            const res = await fetch("/api/check-now", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ competitorId }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                alert(data.error || "Check failed");
-                return;
-            }
-
-            // Update the competitor's last_checked_at
-            setCompetitors((prev) =>
-                prev.map((c) =>
-                    c.id === competitorId
-                        ? { ...c, last_checked_at: new Date().toISOString(), failure_count: 0 }
-                        : c
-                )
-            );
-
-            // Refresh alerts
-            const alertsRes = await fetch("/api/alerts");
-            if (alertsRes.ok) {
-                const alertsData = await alertsRes.json();
-                setAlerts(alertsData.alerts || []);
-            }
-
-            // Show success message
-            const competitor = competitors.find((c) => c.id === competitorId);
-            setCheckSuccess(`✓ ${competitor?.name || "Page"} checked successfully. Snapshot saved.`);
-            setTimeout(() => setCheckSuccess(null), 4000);
-        } catch (err) {
-            alert(err instanceof Error ? err.message : "Check failed");
-        } finally {
-            setCheckingId(null);
-        }
-    };
 
     const [analyzingId, setAnalyzingId] = useState<string | null>(null);
     const [analysisResult, setAnalysisResult] = useState<{
@@ -849,34 +807,23 @@ export default function Dashboard() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-3 mt-5">
+                                                <div className="mt-5">
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        className="text-xs h-9 bg-white/[0.02] border-white/5 flex items-center gap-2 group hover:bg-white/5 hover:border-white/10 text-white/80 hover:text-white transition-all duration-300"
-                                                        onClick={() => handleCheckNow(competitor.id)}
-                                                        disabled={checkingId === competitor.id}
-                                                    >
-                                                        {checkingId === competitor.id ? (
-                                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                        ) : (
-                                                            <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
-                                                        )}
-                                                        Check
-                                                    </Button>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="text-xs h-9 bg-emerald-500/[0.03] border-emerald-500/10 text-emerald-400/90 hover:bg-emerald-500 hover:text-black hover:border-emerald-500 transition-all duration-300 font-medium"
+                                                        className="w-full text-xs h-9 bg-emerald-500/[0.05] border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-black hover:border-emerald-500 transition-all duration-300 font-medium"
                                                         onClick={() => handleAnalyze(competitor.id)}
                                                         disabled={analyzingId === competitor.id}
                                                     >
                                                         {analyzingId === competitor.id ? (
-                                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                            <>
+                                                                <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
+                                                                Scanning...
+                                                            </>
                                                         ) : (
                                                             <span className="flex items-center gap-1.5">
-                                                                <Sparkles className="w-3.5 h-3.5" />
-                                                                Analyze
+                                                                <RefreshCw className="w-3.5 h-3.5" />
+                                                                Scan Now
                                                             </span>
                                                         )}
                                                     </Button>

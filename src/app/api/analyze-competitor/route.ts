@@ -3,6 +3,8 @@ import { getUserId } from "@/lib/auth";
 import { createServerClient } from "@/lib/supabase";
 import { captureAndAnalyze, type CompetitorAnalysis } from "@/lib/ai/visionAnalyzer";
 import { createHash } from "crypto";
+import { getUserWithQuota, canManualCheck, incrementManualCheckCount } from "@/lib/quotas";
+import { detectManualSpam } from "@/lib/abuseDetection";
 
 /**
  * Create a hash of the key analysis fields for change detection
@@ -27,9 +29,9 @@ function hashAnalysis(analysis: CompetitorAnalysis): string {
 /**
  * POST /api/analyze-competitor
  *
- * Screenshot-based competitor analysis using Gemini vision.
- * Captures a full-page screenshot and extracts comprehensive competitive intelligence.
- * Compares with previous analysis to detect changes.
+ * Vision-based competitor analysis using Gemini.
+ * This is the single entry point for manual scans (replaces deprecated /api/check-now).
+ * Subject to quota limits and abuse detection.
  */
 export async function POST(request: Request) {
     try {
@@ -50,7 +52,37 @@ export async function POST(request: Request) {
 
         const supabase = createServerClient();
 
-        // Get competitor details
+        // ── Quota & Abuse Checks ─────────────────────────────────────────────────
+        const user = await getUserWithQuota(supabase, userId);
+        if (!user) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 });
+        }
+
+        // Check abuse patterns
+        const abuseCheck = await detectManualSpam(supabase, userId);
+        if (abuseCheck.flagged) {
+            return NextResponse.json(
+                { error: abuseCheck.message },
+                { status: 429 }
+            );
+        }
+
+        // Check quota
+        const quotaCheck = canManualCheck(user);
+        if (!quotaCheck.allowed) {
+            return NextResponse.json(
+                {
+                    error: quotaCheck.reason,
+                    upgradePrompt: quotaCheck.upgradePrompt,
+                },
+                { status: 429 }
+            );
+        }
+
+        // Increment quota before analysis
+        await incrementManualCheckCount(supabase, userId);
+
+        // ── Get Competitor ───────────────────────────────────────────────────────
         const { data: competitor, error: fetchError } = await supabase
             .from("competitors")
             .select("*")

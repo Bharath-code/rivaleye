@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import { getUserId, getCurrentUser } from "@/lib/auth";
+import { getUserId } from "@/lib/auth";
 import { analyzeCompetitorTask } from "@/trigger/analyzeCompetitor";
 
 /**
@@ -24,9 +24,9 @@ async function ensureUserExists(userId: string): Promise<void> {
         .single();
 
     if (!existingUser) {
-        // Get user email from auth
-        const user = await getCurrentUser();
-        const email = user?.email || `user-${userId}@temp.local`;
+        // Get user email directly from Supabase Auth (admin API)
+        const { data: authData } = await supabase.auth.admin.getUserById(userId);
+        const email = authData?.user?.email || `user-${userId}@temp.local`;
 
         await supabase.from("users").insert({
             id: userId,
@@ -38,7 +38,7 @@ async function ensureUserExists(userId: string): Promise<void> {
             last_quota_reset: new Date().toISOString(),
         });
 
-        console.log(`Created user record for ${userId}`);
+        console.log(`Created user record for ${userId} with email: ${email}`);
     }
 }
 
