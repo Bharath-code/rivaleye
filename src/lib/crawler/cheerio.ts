@@ -29,7 +29,12 @@ function htmlToMarkdown($: cheerio.CheerioAPI): string {
     // Helper to add line if not seen
     const addLine = (text: string, prefix = "") => {
         const clean = text.trim().replace(/\s+/g, " ");
-        if (clean && clean.length > 10 && !seen.has(clean)) {
+        if (!clean || seen.has(clean)) return;
+
+        // Allow shorter lines if they look like pricing (e.g. "$49/mo")
+        const isPrice = /\$[\d,]+|\d+\s*\/\s*mo|free|enterprise|contact/i.test(clean);
+
+        if (isPrice || clean.length > 10) {
             seen.add(clean);
             lines.push(prefix ? `${prefix} ${clean}` : clean);
         }

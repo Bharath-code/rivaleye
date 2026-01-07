@@ -9,63 +9,63 @@ import type { AIInsight } from "@/lib/types";
  */
 
 function getResendClient(): Resend {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-        throw new Error("Missing RESEND_API_KEY environment variable");
-    }
-    return new Resend(apiKey);
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing RESEND_API_KEY environment variable");
+  }
+  return new Resend(apiKey);
 }
 
 interface AlertEmailParams {
-    to: string;
-    competitorName: string;
-    pageUrl: string;
-    insight: AIInsight;
+  to: string;
+  competitorName: string;
+  pageUrl: string;
+  insight: AIInsight;
 }
 
 export async function sendAlertEmail(params: AlertEmailParams): Promise<boolean> {
-    const { to, competitorName, pageUrl, insight } = params;
+  const { to, competitorName, pageUrl, insight } = params;
 
-    try {
-        const client = getResendClient();
+  try {
+    const client = getResendClient();
 
-        const subject = `${competitorName} made a change — here's what it may mean`;
+    const subject = `${competitorName} made a change — here's what it may mean`;
 
-        const htmlContent = buildEmailHtml(competitorName, pageUrl, insight);
-        const textContent = buildEmailText(competitorName, pageUrl, insight);
+    const htmlContent = buildEmailHtml(competitorName, pageUrl, insight);
+    const textContent = buildEmailText(competitorName, pageUrl, insight);
 
-        const result = await client.emails.send({
-            from: process.env.RESEND_FROM_EMAIL || "RivalEye <alerts@rivaleye.io>",
-            to,
-            subject,
-            html: htmlContent,
-            text: textContent,
-        });
+    const result = await client.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || "RivalEye <alerts@rivaleye.io>",
+      to,
+      subject,
+      html: htmlContent,
+      text: textContent,
+    });
 
-        if (result.error) {
-            console.error("Error sending email:", result.error);
-            return false;
-        }
-
-        return true;
-    } catch (error) {
-        console.error("Error sending alert email:", error);
-        return false;
+    if (result.error) {
+      console.error("Error sending email:", result.error);
+      return false;
     }
+
+    return true;
+  } catch (error) {
+    console.error("Error sending alert email:", error);
+    return false;
+  }
 }
 
 function buildEmailHtml(
-    competitorName: string,
-    pageUrl: string,
-    insight: AIInsight
+  competitorName: string,
+  pageUrl: string,
+  insight: AIInsight
 ): string {
-    const confidenceLabel = {
-        high: "High confidence signal",
-        medium: "Notable signal",
-        low: "Possible signal",
-    }[insight.confidence];
+  const confidenceLabel = {
+    high: "High confidence signal",
+    medium: "Notable signal",
+    low: "Possible signal",
+  }[insight.confidence];
 
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -136,11 +136,11 @@ function buildEmailHtml(
 }
 
 function buildEmailText(
-    competitorName: string,
-    pageUrl: string,
-    insight: AIInsight
+  competitorName: string,
+  pageUrl: string,
+  insight: AIInsight
 ): string {
-    return `
+  return `
 ${competitorName} made a change
 Monitored page: ${pageUrl}
 

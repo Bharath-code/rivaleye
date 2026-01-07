@@ -231,7 +231,7 @@ export async function fetchPagePlaywright(url: string): Promise<CrawlResponse> {
         };
     } catch (error: unknown) {
         if (page) {
-            await page.close().catch(() => { });
+            await (page.close() as Promise<void>).catch(() => { });
         }
 
         if (error instanceof Error) {
