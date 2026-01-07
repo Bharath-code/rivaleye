@@ -119,6 +119,16 @@ export async function POST(request: Request) {
             );
         }
 
+        // Upload screenshot to Cloudflare R2
+        let screenshotPath = null;
+        if (screenshot) {
+            const { uploadScreenshot } = await import("@/lib/crawler/screenshotStorage");
+            const uploadResult = await uploadScreenshot(competitorId, "manual", screenshot);
+            if (uploadResult.success) {
+                screenshotPath = uploadResult.path;
+            }
+        }
+
         // Hash current analysis for change detection
         const currentHash = hashAnalysis(analysis.analysis);
         const previousHash = previousAnalysis?.analysis_hash || null;
@@ -132,6 +142,7 @@ export async function POST(request: Request) {
             analysis_hash: currentHash,
             raw_analysis: analysis.rawAnalysis,
             screenshot_size: analysis.screenshotSize,
+            screenshot_path: screenshotPath, // Store the R2 path
             model: analysis.model,
             has_changes: hasChanged,
             created_at: analysis.timestamp,
@@ -196,8 +207,21 @@ export async function POST(request: Request) {
         });
     } catch (error) {
         console.error("[Vision API] Error:", error);
+
+        // Specific handling for Gemini Rate Limits (429)
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes("429") || errorMessage.includes("quota")) {
+            return NextResponse.json(
+                {
+                    error: "AI Rate Limit Reached. Gemini Free Tier limits input tokens. Please wait 1-2 minutes or use a smaller page.",
+                    code: "RATE_LIMIT_EXCEEDED"
+                },
+                { status: 429 }
+            );
+        }
+
         return NextResponse.json(
-            { error: error instanceof Error ? error.message : "Analysis failed" },
+            { error: errorMessage || "Analysis failed" },
             { status: 500 }
         );
     }

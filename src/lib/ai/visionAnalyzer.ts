@@ -153,15 +153,18 @@ async function compressScreenshot(buffer: Buffer): Promise<Buffer> {
         const metadata = await sharp(buffer).metadata();
         const width = metadata.width || 1440;
 
-        // Resize if too wide (max 1200px) and convert to JPEG with quality 75
+        // Resize aggressively for Free Tier token limits
+        // Max width 1000px, Max height 2000px
         const compressed = await sharp(buffer)
             .resize({
-                width: Math.min(width, 1200),
+                width: 1000,
+                height: 2000,
+                fit: "inside",
                 withoutEnlargement: true,
             })
             .jpeg({
-                quality: 75,
-                mozjpeg: true,  // Better compression
+                quality: 60, // Lower quality to save tokens
+                mozjpeg: true,
             })
             .toBuffer();
 
@@ -205,7 +208,7 @@ export async function analyzeScreenshot(
         ].filter(Boolean).join("\n");
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
+            model: "gemini-3-flash-preview",
             contents: [
                 {
                     role: "user",

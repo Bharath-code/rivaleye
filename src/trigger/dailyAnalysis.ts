@@ -207,6 +207,20 @@ export const dailyCompetitorAnalysis = schedules.task({
                     const previousHash = prevAnalysis?.analysis_hash || null;
                     const hasChanged = previousHash !== currentHash;
 
+                    // Upload screenshot to Cloudflare R2
+                    let screenshotPath = null;
+                    if (screenshot) {
+                        try {
+                            const { uploadScreenshot } = await import("@/lib/crawler/screenshotStorage");
+                            const uploadResult = await uploadScreenshot(competitor.id, "daily", screenshot);
+                            if (uploadResult.success) {
+                                screenshotPath = uploadResult.path;
+                            }
+                        } catch (uploadErr) {
+                            logger.warn("R2 Upload failed during daily task", { error: uploadErr });
+                        }
+                    }
+
                     // Store
                     await supabase.from("analyses").insert({
                         competitor_id: competitor.id,
@@ -215,6 +229,7 @@ export const dailyCompetitorAnalysis = schedules.task({
                         analysis_hash: currentHash,
                         raw_analysis: rawText,
                         screenshot_size: screenshot.length,
+                        screenshot_path: screenshotPath, // Store the R2 path
                         model: "gemini-2.0-flash",
                         has_changes: hasChanged,
                     });

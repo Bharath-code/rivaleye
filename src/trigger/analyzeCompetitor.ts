@@ -155,6 +155,20 @@ export const analyzeCompetitorTask = task({
             const previousHash = prevAnalysis?.analysis_hash || null;
             const hasChanged = previousHash !== currentHash;
 
+            // Upload screenshot to Cloudflare R2
+            let screenshotPath = null;
+            if (screenshot) {
+                try {
+                    const { uploadScreenshot } = await import("@/lib/crawler/screenshotStorage");
+                    const uploadResult = await uploadScreenshot(competitorId, "on-demand", screenshot);
+                    if (uploadResult.success) {
+                        screenshotPath = uploadResult.path;
+                    }
+                } catch (uploadErr) {
+                    logger.warn("R2 Upload failed during on-demand task", { error: uploadErr });
+                }
+            }
+
             // Store
             metadata.set("status", "Saving results");
             metadata.set("progress", 90);
@@ -166,6 +180,7 @@ export const analyzeCompetitorTask = task({
                 analysis_hash: currentHash,
                 raw_analysis: rawText,
                 screenshot_size: screenshot.length,
+                screenshot_path: screenshotPath, // Store the R2 path
                 model: "gemini-2.0-flash",
                 has_changes: hasChanged,
             });

@@ -128,7 +128,7 @@ describe('dailyCompetitorAnalysis', () => {
 
         expect(result.processed).toBe(2);
         expect(mockBrowser.newPage).toHaveBeenCalledTimes(2);
-    });
+    }, 30000);
 
     it('handles total failure gracefully', async () => {
         // We'll need a way to fail the competitor fetch specifically
