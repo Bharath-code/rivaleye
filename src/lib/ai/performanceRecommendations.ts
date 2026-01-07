@@ -128,6 +128,8 @@ export async function generatePerformanceRecommendations(
         const ai = new GoogleGenAI({ apiKey });
         const prompt = buildPerformancePrompt(psiData, competitorName);
 
+        console.log("[AI Recommendations] Starting analysis for", competitorName);
+
         const response = await ai.models.generateContent({
             model: "gemini-2.0-flash",
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -137,12 +139,16 @@ export async function generatePerformanceRecommendations(
             },
         });
 
-        const rawText = response.text || "";
+        const rawText = typeof response.text === "string"
+            ? response.text
+            : typeof (response as any).response?.text === "function"
+                ? (response as any).response.text()
+                : "";
 
         // Parse JSON from response
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
-            console.error("[AI Recommendations] No JSON found in response");
+            console.error("[AI Recommendations] No JSON found in response. Text:", rawText);
             return null;
         }
 
@@ -167,7 +173,7 @@ export function generateFallbackSummary(psiData: PSIResult): AIPerformanceAnalys
             priority: opp.score !== null && opp.score < 0.5 ? "high" : "medium",
             category: "speed",
             issue: opp.title,
-            action: opp.description.split(".")[0] + ".",
+            action: (opp.description || "").split(".")[0] + ".",
             impact: opp.displayValue || "Improves load time",
         });
     }

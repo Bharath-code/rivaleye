@@ -1,17 +1,41 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// Mock Playwright to avoid browser launches
+// Use vi.hoisted to ensure mocks are available
+const { mockPage, mockBrowser, mockContext } = vi.hoisted(() => {
+    const page = {
+        goto: vi.fn(),
+        waitForTimeout: vi.fn(),
+        evaluate: vi.fn(),
+        close: vi.fn(),
+        on: vi.fn(),
+        route: vi.fn(),
+        setDefaultTimeout: vi.fn(),
+    }
+    const context = {
+        newPage: vi.fn(),
+        close: vi.fn(),
+    }
+    const browser = {
+        isConnected: vi.fn(),
+        newContext: vi.fn(),
+        close: vi.fn(),
+    }
+    return { mockPage: page, mockBrowser: browser, mockContext: context }
+})
+
 vi.mock('playwright', () => ({
     chromium: {
-        launch: vi.fn(),
-    },
+        launch: vi.fn().mockImplementation(() => Promise.resolve(mockBrowser))
+    }
 }))
 
 import {
+    detectTechStack,
+    closeTechStackBrowser,
     compareTechStacks,
     type DetectedTech,
-    type TechCategory,
 } from '../techStackDetector'
+import { chromium } from 'playwright'
 
 // ──────────────────────────────────────────────────────────────────────────────
 // MOCK DATA FACTORIES
@@ -28,6 +52,118 @@ function createMockTech(overrides: Partial<DetectedTech> = {}): DetectedTech {
 }
 
 describe('techStackDetector', () => {
+    beforeEach(() => {
+        vi.resetAllMocks()
+
+        mockPage.goto.mockResolvedValue({ headers: () => ({}) })
+        mockPage.waitForTimeout.mockResolvedValue(undefined)
+        mockPage.evaluate.mockResolvedValue(['react'])
+        mockPage.close.mockResolvedValue(undefined)
+        mockPage.on.mockReturnValue(undefined)
+        mockPage.route.mockResolvedValue(undefined)
+        mockPage.setDefaultTimeout.mockReturnValue(undefined)
+        // @ts-ignore - adding content method
+        mockPage.content = vi.fn().mockResolvedValue('<html></html>')
+
+        mockContext.newPage.mockResolvedValue(mockPage)
+        mockContext.close.mockResolvedValue(undefined)
+
+        mockBrowser.isConnected.mockReturnValue(true)
+        mockBrowser.newContext.mockResolvedValue(mockContext)
+        mockBrowser.close.mockResolvedValue(undefined)
+
+        vi.mocked(chromium.launch).mockResolvedValue(mockBrowser as any)
+
+        vi.spyOn(console, 'log').mockImplementation(() => { })
+        vi.spyOn(console, 'error').mockImplementation(() => { })
+    })
+
+    afterEach(async () => {
+        await closeTechStackBrowser()
+        vi.restoreAllMocks()
+    })
+
+    describe('detectTechStack', () => {
+        it('returns TIMEOUT error when page load times out', async () => {
+            mockPage.goto.mockRejectedValue(new Error('Timeout 60000ms exceeded'))
+
+            const result = await detectTechStack('https://slow-site.com')
+
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.code).toBe('TIMEOUT')
+            }
+        })
+
+        it('returns BLOCKED error when access is denied', async () => {
+            mockPage.goto.mockRejectedValue(new Error('403 Forbidden'))
+
+            const result = await detectTechStack('https://blocked-site.com')
+
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.code).toBe('BLOCKED')
+            }
+        })
+
+        it('returns BLOCKED error when explicitly blocked', async () => {
+            mockPage.goto.mockRejectedValue(new Error('Access blocked'))
+
+            const result = await detectTechStack('https://protected-site.com')
+
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.code).toBe('BLOCKED')
+            }
+        })
+
+        it('returns UNKNOWN error for generic errors', async () => {
+            mockPage.goto.mockRejectedValue(new Error('Network connection lost'))
+
+            const result = await detectTechStack('https://example.com')
+
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.code).toBe('UNKNOWN')
+                expect(result.error).toBe('Network connection lost')
+            }
+        })
+
+        it('handles browser launch failure', async () => {
+            await closeTechStackBrowser()
+            vi.mocked(chromium.launch).mockRejectedValueOnce(new Error('Browser launch failed'))
+
+            const result = await detectTechStack('https://example.com')
+
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.error).toBe('Browser launch failed')
+            }
+        })
+
+        it('closes page and context on error', async () => {
+            mockPage.goto.mockRejectedValue(new Error('Test error'))
+
+            await detectTechStack('https://example.com')
+
+            expect(mockPage.close).toHaveBeenCalled()
+            expect(mockContext.close).toHaveBeenCalled()
+        })
+    })
+
+    describe('closeTechStackBrowser', () => {
+        it('closes browser instance', async () => {
+            await closeTechStackBrowser()
+            // Should not throw
+        })
+
+        it('handles multiple close calls gracefully', async () => {
+            await closeTechStackBrowser()
+            await closeTechStackBrowser()
+            // Should not throw
+        })
+    })
+
     describe('compareTechStacks', () => {
         it('returns no changes when stacks are identical', () => {
             const stack = [createMockTech({ name: 'React' })]
@@ -141,3 +277,4 @@ describe('techStackDetector', () => {
         })
     })
 })
+

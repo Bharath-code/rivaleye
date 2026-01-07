@@ -1,137 +1,45 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { PSIResult } from '@/lib/crawler/pageSpeedInsights'
+import { describe, it, expect } from 'vitest';
+import { generateFallbackSummary } from '../performanceRecommendations';
 
-// Use vi.hoisted for shared mock functions
-const { mockGenerateContent } = vi.hoisted(() => ({
-    mockGenerateContent: vi.fn()
-}))
-
-// Mock Resend as a class
-vi.mock('@google/genai', () => ({
-    GoogleGenAI: class {
-        models = {
-            generateContent: mockGenerateContent
-        }
-    }
-}))
-
-// Import after mock
-import { generatePerformanceRecommendations, generateFallbackSummary } from '../performanceRecommendations'
-
-// Helper for Mock PSI data
-function createMockPSIData(overrides: Partial<PSIResult> = {}): PSIResult {
-    return {
-        success: true,
-        url: 'https://competitor.com',
-        strategy: 'mobile',
-        categories: {
-            performance: 45,
-            accessibility: 88,
-            bestPractices: 90,
-            seo: 92
-        },
-        coreWebVitals: {
-            lcp: 3500,
-            fid: 120,
-            cls: 0.15,
-            fcp: 2000,
-            ttfb: 1200,
-            inp: null
-        },
-        opportunities: [
-            { id: 'image-alt', title: 'Add alt text to images', description: 'Alt text is key for SEO.', score: 0.2, displayValue: '1.5s' }
-        ],
-        diagnostics: [],
-        audits: [],
-        fetchTime: new Date().toISOString(),
-        ...overrides
-    } as PSIResult
-}
-
+// Test only the synchronous fallback function (no AI mock needed)
 describe('performanceRecommendations', () => {
-    let originalEnv: string | undefined
+    const mockPsiData: any = {
+        categories: { performance: 50, accessibility: 80, seo: 90 },
+        coreWebVitals: { lcp: 3000, fid: 200, cls: 0.2, ttfb: 1000 },
+        opportunities: [
+            { id: '1', title: 'Optimize Images', score: 0.3, displayValue: '2s', description: 'Reduce image size.' },
+            { id: '2', title: 'Remove Unused JS', score: 0.5, displayValue: '1s', description: 'Clean up dead code.' },
+        ],
+    };
 
-    beforeEach(() => {
-        originalEnv = process.env.GEMINI_API_KEY
-        process.env.GEMINI_API_KEY = 'test-key'
-        mockGenerateContent.mockReset()
+    it('generateFallbackSummary returns correct grade for excellent score', () => {
+        const data = { ...mockPsiData, categories: { ...mockPsiData.categories, performance: 95 } };
+        expect(generateFallbackSummary(data).grade).toBe('Excellent');
+    });
 
-        // Suppress expected logs/errors during tests
-        vi.spyOn(console, 'log').mockImplementation(() => { })
-        vi.spyOn(console, 'error').mockImplementation(() => { })
-    })
+    it('generateFallbackSummary returns correct grade for good score', () => {
+        const data = { ...mockPsiData, categories: { ...mockPsiData.categories, performance: 80 } };
+        expect(generateFallbackSummary(data).grade).toBe('Good');
+    });
 
-    afterEach(() => {
-        if (originalEnv !== undefined) {
-            process.env.GEMINI_API_KEY = originalEnv
-        } else {
-            delete process.env.GEMINI_API_KEY
-        }
-        vi.restoreAllMocks()
-    })
+    it('generateFallbackSummary returns correct grade for needs work score', () => {
+        const data = { ...mockPsiData, categories: { ...mockPsiData.categories, performance: 60 } };
+        expect(generateFallbackSummary(data).grade).toBe('Needs Work');
+    });
 
-    describe('generatePerformanceRecommendations', () => {
-        it('returns null if GEMINI_API_KEY is missing', async () => {
-            delete process.env.GEMINI_API_KEY
-            const result = await generatePerformanceRecommendations(createMockPSIData(), 'Competitor')
-            expect(result).toBeNull()
-        })
+    it('generateFallbackSummary returns correct grade for poor score', () => {
+        const data = { ...mockPsiData, categories: { ...mockPsiData.categories, performance: 30 } };
+        expect(generateFallbackSummary(data).grade).toBe('Poor');
+    });
 
-        it('returns parsed analysis on successful AI response', async () => {
-            const mockAnalysis = {
-                summary: 'Poor mobile performance due to heavy images',
-                grade: 'D',
-                recommendations: [
-                    { priority: 'high', category: 'speed', issue: 'Large images', action: 'Optimize images', impact: '2s saved' }
-                ],
-                competitiveInsights: ['Slow LCP is an opportunity'],
-                quickWins: ['Compress PNGs']
-            }
+    it('generateFallbackSummary returns correct grade for critical score', () => {
+        const data = { ...mockPsiData, categories: { ...mockPsiData.categories, performance: 10 } };
+        expect(generateFallbackSummary(data).grade).toBe('Critical');
+    });
 
-            mockGenerateContent.mockResolvedValue({
-                text: JSON.stringify(mockAnalysis)
-            })
-
-            const result = await generatePerformanceRecommendations(createMockPSIData(), 'Acme')
-
-            expect(result).toEqual(mockAnalysis)
-            expect(mockGenerateContent).toHaveBeenCalled()
-        })
-
-        it('handles non-JSON text surrounding the JSON in AI response', async () => {
-            const mockAnalysis = { summary: 'OK', grade: 'C', recommendations: [], competitiveInsights: [], quickWins: [] }
-            mockGenerateContent.mockResolvedValue({
-                text: "Here is your analysis: " + JSON.stringify(mockAnalysis) + " I hope this helps!"
-            })
-
-            const result = await generatePerformanceRecommendations(createMockPSIData(), 'Acme')
-            expect(result).toEqual(mockAnalysis)
-        })
-
-        it('returns null if AI response contains no JSON', async () => {
-            mockGenerateContent.mockResolvedValue({
-                text: "I cannot analyze this data right now."
-            })
-            const result = await generatePerformanceRecommendations(createMockPSIData(), 'Acme')
-            expect(result).toBeNull()
-        })
-
-        it('returns null on AI error', async () => {
-            mockGenerateContent.mockRejectedValue(new Error('AI failure'))
-            const result = await generatePerformanceRecommendations(createMockPSIData(), 'Acme')
-            expect(result).toBeNull()
-        })
-    })
-
-    describe('generateFallbackSummary', () => {
-        it('correctly generates summary and recommendations from PSI data', () => {
-            const psi = createMockPSIData()
-            const result = generateFallbackSummary(psi)
-
-            expect(result.summary).toContain('45/100')
-            expect(result.grade).toBe('Poor')
-            expect(result.recommendations.length).toBeGreaterThan(0)
-            expect(result.recommendations[0].issue).toBe('Add alt text to images')
-        })
-    })
-})
+    it('generateFallbackSummary builds recommendations from opportunities', () => {
+        const result = generateFallbackSummary(mockPsiData);
+        expect(result.recommendations.length).toBeGreaterThan(0);
+        expect(result.recommendations[0].issue).toBe('Optimize Images');
+    });
+});

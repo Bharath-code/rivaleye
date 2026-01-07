@@ -1,20 +1,51 @@
-import { describe, it, expect } from 'vitest'
-import { generateFallbackInsight } from '../pricingInsights'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { generateFallbackInsight, generatePricingInsight } from '../pricingInsights'
 import type { DetectedDiff } from '../pricingDiff'
 
 // Helper to create a mock diff
 function createMockDiff(type: DetectedDiff['type']): DetectedDiff {
     return {
         type,
-        severity: 0.8,
+        severity: 8,
         planName: 'Pro',
         before: '$49/month',
         after: '$79/month',
         description: 'Price changed',
+        isMeaningful: true,
     }
 }
 
 describe('pricingInsights', () => {
+    let originalGeminiKey: string | undefined
+
+    beforeEach(() => {
+        originalGeminiKey = process.env.GEMINI_API_KEY
+        vi.spyOn(console, 'log').mockImplementation(() => { })
+        vi.spyOn(console, 'error').mockImplementation(() => { })
+    })
+
+    afterEach(() => {
+        if (originalGeminiKey !== undefined) {
+            process.env.GEMINI_API_KEY = originalGeminiKey
+        } else {
+            delete process.env.GEMINI_API_KEY
+        }
+        vi.restoreAllMocks()
+    })
+
+    describe('generatePricingInsight', () => {
+        it('returns error when GEMINI_API_KEY is not set', async () => {
+            delete process.env.GEMINI_API_KEY
+
+            const result = await generatePricingInsight(createMockDiff('price_increase'))
+
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.error).toBe('GEMINI_API_KEY not configured')
+            }
+        })
+    })
+
     describe('generateFallbackInsight', () => {
         it('returns insight for price_increase', () => {
             const diff = createMockDiff('price_increase')

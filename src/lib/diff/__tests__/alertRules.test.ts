@@ -13,9 +13,9 @@ function createMockDiff(overrides: Partial<DetectedDiff> = {}): DetectedDiff {
         type: 'price_increase',
         description: 'Pro plan increased from $49 to $79',
         severity: 0.7,
+        planName: 'Pro',
         before: '$49/month',
         after: '$79/month',
-        changePercent: 61.2,
         ...overrides,
     }
 }
@@ -92,7 +92,13 @@ describe('alertRules', () => {
 
             const mediumSeverity = createMockDiff({ severity: 0.6 })
             expect(shouldTriggerAlert(mediumSeverity).severity).toBe('medium')
+
+            const lowSeverity = createMockDiff({ severity: 0.3 })
+            // We need to check use mapSeverity directly or via a function that doesn't fail threshold
+            // Actually shouldTriggerAlert fails before mapping if severity < 0.5
+            // But formatAlertContent calls mapSeverity via buildAlertBody
         })
+
 
         it('calculates priority with boost for high-impact types', () => {
             const freeTierRemoved = createMockDiff({
@@ -159,5 +165,27 @@ describe('alertRules', () => {
             expect(alert.body).toContain('Before')
             expect(alert.body).toContain('After')
         })
+
+        it('handles low severity in formatting', () => {
+            const diff = createMockDiff({ severity: 0.3 })
+            const alert = formatAlertContent(diff, 'Test')
+            expect(alert.body.toLowerCase()).toContain('low')
+        })
+
+        it('handles plan_added (no before content)', () => {
+            const diff = createMockDiff({ type: 'plan_added', before: null })
+            const alert = formatAlertContent(diff, 'Test')
+            expect(alert.body).not.toContain('Before')
+            expect(alert.body).toContain('After')
+        })
+
+        it('handles plan_removed (no after content)', () => {
+            const diff = createMockDiff({ type: 'plan_removed', after: null })
+            const alert = formatAlertContent(diff, 'Test')
+            expect(alert.body).toContain('Before')
+            expect(alert.body).not.toContain('After')
+        })
     })
 })
+
+

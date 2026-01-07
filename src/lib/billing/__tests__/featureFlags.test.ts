@@ -70,6 +70,11 @@ describe('featureFlags', () => {
             const result = canPerformAction('addCompetitor', 5, 'pro')
             expect(result.allowed).toBe(false)
         })
+
+        it('allows other actions by default (covering switch default)', () => {
+            const result = canPerformAction('canUseGeoAware', 0, 'free')
+            expect(result.allowed).toBe(true)
+        })
     })
 
     describe('PLAN_LIMITS', () => {

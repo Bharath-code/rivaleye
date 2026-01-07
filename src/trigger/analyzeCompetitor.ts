@@ -93,14 +93,14 @@ export const analyzeCompetitorTask = task({
 
         const prevAnalysis = prevAnalyses?.[0];
 
-        // Screenshot
-        metadata.set("status", "Taking screenshot");
-        metadata.set("progress", 20);
-
-        const browser = await chromium.launch({ headless: true });
-        const page = await browser.newPage();
-
+        let browser;
         try {
+            metadata.set("status", "Taking screenshot");
+            metadata.set("progress", 20);
+
+            browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage();
+
             await page.setViewportSize({ width: 1440, height: 900 });
             await page.goto(competitorUrl, { waitUntil: "networkidle", timeout: 30000 });
             await page.waitForTimeout(2000);
@@ -190,7 +190,7 @@ export const analyzeCompetitorTask = task({
                 screenshotSize: screenshot.length,
             };
         } catch (error) {
-            await browser.close();
+            if (browser) await (browser as any).close();
             logger.error("Analysis failed", { error });
             metadata.set("status", "Failed");
             return { success: false, error: error instanceof Error ? error.message : "Unknown error" };

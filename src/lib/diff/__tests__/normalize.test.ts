@@ -55,6 +55,21 @@ describe('normalize', () => {
             expect(result.length).toBeLessThanOrEqual(4000)
         })
 
+        it('truncates at sentence boundary for long text', () => {
+            // Create text > 4000 chars with a sentence boundary around 3500
+            const part1 = 'A'.repeat(3500)
+            const sentenceBoundary = '. '
+            const part2 = 'B'.repeat(1000)
+            const longText = part1 + sentenceBoundary + part2
+
+            const result = normalizeText(longText)
+
+            // Should truncate at the '. ' which is at index approx 3501
+            expect(result.length).toBeLessThanOrEqual(3501)
+            expect(result.endsWith('.')).toBe(true)
+        })
+
+
         it('removes testimonial sections', () => {
             const result = normalizeText('Pricing info here. Testimonials: John said it was great. More content.')
             expect(result).not.toContain('john said')

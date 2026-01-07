@@ -120,6 +120,23 @@ describe('isMeaningful', () => {
         })
     })
 
+    describe('positioning detection', () => {
+        it('detects headline-style positioning changes', () => {
+            // Use text that matches positioning keywords but not pricing/plan/cta/feature
+            const diff = createDiff('Welcome to our product', 'The #1 best product in the market.')
+            const result = isMeaningful(diff)
+            expect(result.isMeaningful).toBe(true)
+            expect(result.signalType).toBe('positioning')
+        })
+
+        it('detects introducing/announcing language', () => {
+            const diff = createDiff('', 'Introducing our new innovative solution.')
+            const result = isMeaningful(diff)
+            expect(result.isMeaningful).toBe(true)
+            expect(result.signalType).toBe('positioning')
+        })
+    })
+
     describe('noise filtering', () => {
         it('filters out copyright/footer noise', () => {
             const diff = createDiff('© 2023 All rights reserved', '© 2024 All rights reserved')
@@ -143,4 +160,15 @@ describe('isMeaningful', () => {
             expect(result.reason).toContain('Substantial')
         })
     })
+
+    describe('minor changes', () => {
+        it('returns not meaningful for small grammar edits', () => {
+            // Small text change that doesn't match any keywords
+            const diff = createDiff('Hello there', 'Hi there')
+            const result = isMeaningful(diff)
+            expect(result.isMeaningful).toBe(false)
+            expect(result.reason).toContain('minor')
+        })
+    })
 })
+

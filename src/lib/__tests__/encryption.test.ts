@@ -115,6 +115,13 @@ describe('encryption', () => {
             expect(isEncrypted('not-base64!!!')).toBe(false)
         })
 
+        it('returns false for null/undefined', () => {
+            // @ts-ignore
+            expect(isEncrypted(null)).toBe(false)
+            // @ts-ignore
+            expect(isEncrypted(undefined)).toBe(false)
+        })
+
         it('returns true for base64 with sufficient length', () => {
             // Create a base64 string that represents > 32 bytes
             const longEnough = Buffer.alloc(64).toString('base64')
@@ -158,7 +165,18 @@ describe('encryption', () => {
             const result = encryptWebhookUrl(encrypted!)
             expect(result).toBeNull()
         })
+
+        it('prevents double encryption if URL looks like encrypted data', () => {
+            // A string that starts with https:// AND looks like base64 > 32 bytes
+            // 'https://' itself decodes to something. We just need enough base64 after it.
+            const pseudoEncrypted = 'https://' + 'A'.repeat(100)
+
+            // This should trigger line 105: return url;
+            const result = encryptWebhookUrl(pseudoEncrypted)
+            expect(result).toBe(pseudoEncrypted)
+        })
     })
+
 
     describe('decryptWebhookUrl', () => {
         it('decrypts an encrypted webhook URL', () => {

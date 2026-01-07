@@ -1,20 +1,43 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// Mock Playwright to avoid browser launches
+// Use vi.hoisted to ensure mocks are available
+const { mockPage, mockBrowser, mockContext, mockCdpSession } = vi.hoisted(() => {
+    const cdpSession = {
+        send: vi.fn(),
+    }
+    const page = {
+        goto: vi.fn(),
+        waitForTimeout: vi.fn(),
+        evaluate: vi.fn(),
+        close: vi.fn(),
+        on: vi.fn(),
+    }
+    const context = {
+        newPage: vi.fn(),
+        newCDPSession: vi.fn(),
+        close: vi.fn(),
+    }
+    const browser = {
+        isConnected: vi.fn(),
+        newContext: vi.fn(),
+        close: vi.fn(),
+    }
+    return { mockPage: page, mockBrowser: browser, mockContext: context, mockCdpSession: cdpSession }
+})
+
 vi.mock('playwright', () => ({
     chromium: {
-        launch: vi.fn(),
-    },
+        launch: vi.fn().mockImplementation(() => Promise.resolve(mockBrowser))
+    }
 }))
 
 import {
+    analyzePerformance,
+    closePerformanceBrowser,
     comparePerformance,
     type PerformanceInsights,
-    type CoreWebVitals,
-    type PerformanceMetrics,
-    type ResourceMetrics,
-    type PerformanceScore,
 } from '../performanceInsights'
+import { chromium } from 'playwright'
 
 // ──────────────────────────────────────────────────────────────────────────────
 // MOCK DATA FACTORIES
@@ -56,6 +79,123 @@ function createMockInsights(overrides: Partial<PerformanceInsights> = {}): Perfo
 }
 
 describe('performanceInsights', () => {
+    beforeEach(() => {
+        vi.resetAllMocks()
+
+        mockPage.goto.mockResolvedValue(undefined)
+        mockPage.waitForTimeout.mockResolvedValue(undefined)
+        mockPage.evaluate.mockResolvedValue({
+            ttfb: 500,
+            fcp: 1800,
+            domContentLoaded: 2000,
+            loadComplete: 3000,
+            lcp: 2500,
+            cls: 0.1,
+        })
+        mockPage.close.mockResolvedValue(undefined)
+        mockPage.on.mockReturnValue(undefined)
+
+        mockCdpSession.send.mockResolvedValue(undefined)
+
+        mockContext.newPage.mockResolvedValue(mockPage)
+        mockContext.newCDPSession.mockResolvedValue(mockCdpSession)
+        mockContext.close.mockResolvedValue(undefined)
+
+        mockBrowser.isConnected.mockReturnValue(true)
+        mockBrowser.newContext.mockResolvedValue(mockContext)
+        mockBrowser.close.mockResolvedValue(undefined)
+
+        vi.mocked(chromium.launch).mockResolvedValue(mockBrowser as any)
+
+        vi.spyOn(console, 'log').mockImplementation(() => { })
+        vi.spyOn(console, 'error').mockImplementation(() => { })
+    })
+
+    afterEach(async () => {
+        await closePerformanceBrowser()
+        vi.restoreAllMocks()
+    })
+
+    describe('analyzePerformance', () => {
+        it('returns TIMEOUT error when page load times out', async () => {
+            mockPage.goto.mockRejectedValue(new Error('Timeout 60000ms exceeded'))
+
+            const result = await analyzePerformance('https://slow-site.com')
+
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.code).toBe('TIMEOUT')
+            }
+        })
+
+        it('returns BLOCKED error when access is denied', async () => {
+            mockPage.goto.mockRejectedValue(new Error('403 Forbidden'))
+
+            const result = await analyzePerformance('https://blocked-site.com')
+
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.code).toBe('BLOCKED')
+            }
+        })
+
+        it('returns BLOCKED error when explicitly blocked', async () => {
+            mockPage.goto.mockRejectedValue(new Error('Access blocked'))
+
+            const result = await analyzePerformance('https://protected-site.com')
+
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.code).toBe('BLOCKED')
+            }
+        })
+
+        it('returns UNKNOWN error for generic errors', async () => {
+            mockPage.goto.mockRejectedValue(new Error('Network connection lost'))
+
+            const result = await analyzePerformance('https://example.com')
+
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.code).toBe('UNKNOWN')
+                expect(result.error).toBe('Network connection lost')
+            }
+        })
+
+        it('handles browser launch failure', async () => {
+            await closePerformanceBrowser()
+            vi.mocked(chromium.launch).mockRejectedValueOnce(new Error('Browser launch failed'))
+
+            const result = await analyzePerformance('https://example.com')
+
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.error).toBe('Browser launch failed')
+            }
+        })
+
+        it('closes page and context on error', async () => {
+            mockPage.goto.mockRejectedValue(new Error('Test error'))
+
+            await analyzePerformance('https://example.com')
+
+            expect(mockPage.close).toHaveBeenCalled()
+            expect(mockContext.close).toHaveBeenCalled()
+        })
+    })
+
+    describe('closePerformanceBrowser', () => {
+        it('closes browser instance', async () => {
+            await closePerformanceBrowser()
+            // Should not throw
+        })
+
+        it('handles multiple close calls gracefully', async () => {
+            await closePerformanceBrowser()
+            await closePerformanceBrowser()
+            // Should not throw
+        })
+    })
     describe('comparePerformance', () => {
         it('returns stable when no significant changes', () => {
             const oldInsights = createMockInsights()

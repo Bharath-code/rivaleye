@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { canScheduledCrawl, canManualCheck, GLOBAL_LIMITS } from '../quotas'
+import { canScheduledCrawl, canManualCheck, canAddPage, GLOBAL_LIMITS } from '../quotas'
 import type { User } from '@/lib/types'
 
 // Mock user factory
@@ -14,6 +14,19 @@ function createMockUser(overrides: Partial<User> = {}): User {
         created_at: new Date().toISOString(),
         ...overrides,
     } as User
+}
+
+// Mock Supabase client factory
+function createMockSupabase(competitorCount: number = 0) {
+    return {
+        from: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                    eq: vi.fn().mockResolvedValue({ count: competitorCount }),
+                }),
+            }),
+        }),
+    } as any
 }
 
 describe('quotas', () => {
@@ -73,6 +86,48 @@ describe('quotas', () => {
         })
     })
 
+    describe('canAddPage', () => {
+        it('allows free user to add first competitor', async () => {
+            const supabase = createMockSupabase(0)
+            const result = await canAddPage(supabase, 'user-id', 'free')
+            expect(result.allowed).toBe(true)
+        })
+
+        it('blocks free user from adding second competitor', async () => {
+            const supabase = createMockSupabase(1)
+            const result = await canAddPage(supabase, 'user-id', 'free')
+            expect(result.allowed).toBe(false)
+            expect(result.upgradePrompt).toBe(true)
+            expect(result.reason).toContain('Free plan')
+        })
+
+        it('allows pro user to add up to 5 competitors', async () => {
+            const supabase = createMockSupabase(4)
+            const result = await canAddPage(supabase, 'user-id', 'pro')
+            expect(result.allowed).toBe(true)
+        })
+
+        it('blocks pro user from adding 6th competitor', async () => {
+            const supabase = createMockSupabase(5)
+            const result = await canAddPage(supabase, 'user-id', 'pro')
+            expect(result.allowed).toBe(false)
+            expect(result.upgradePrompt).toBe(false)
+            expect(result.reason).toContain('reached the limit')
+        })
+
+        it('allows enterprise user to add up to 50 competitors', async () => {
+            const supabase = createMockSupabase(49)
+            const result = await canAddPage(supabase, 'user-id', 'enterprise')
+            expect(result.allowed).toBe(true)
+        })
+
+        it('blocks enterprise user from adding 51st competitor', async () => {
+            const supabase = createMockSupabase(50)
+            const result = await canAddPage(supabase, 'user-id', 'enterprise')
+            expect(result.allowed).toBe(false)
+        })
+    })
+
     describe('GLOBAL_LIMITS', () => {
         it('has safety limits defined', () => {
             expect(GLOBAL_LIMITS.maxDailyCrawls).toBe(100000)
@@ -80,3 +135,4 @@ describe('quotas', () => {
         })
     })
 })
+

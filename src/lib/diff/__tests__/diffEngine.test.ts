@@ -97,5 +97,18 @@ describe('diffEngine', () => {
             const summary = summarizeDiff(diff)
             expect(summary).toContain('more changes')
         })
+
+        it('truncates long block text with ellipsis', () => {
+            const longText = 'A'.repeat(100)
+            const diff: DiffResult = {
+                hasChanges: true,
+                changedBlocks: [
+                    { oldText: longText, newText: 'Short' },
+                ],
+            }
+            const summary = summarizeDiff(diff)
+            expect(summary).toContain('...')
+        })
     })
 })
+

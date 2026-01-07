@@ -1,23 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { generateText, isAIAvailable } from '../aiProvider'
 
-// We need to mock the external SDKs
-vi.mock('@google/genai', () => ({
-    GoogleGenAI: vi.fn().mockImplementation(() => ({
-        models: {
-            generateContent: vi.fn(),
-        },
-    })),
-}))
-
-vi.mock('@openrouter/sdk', () => ({
-    OpenRouter: vi.fn().mockImplementation(() => ({
-        callModel: vi.fn().mockReturnValue({
-            getText: vi.fn(),
-        }),
-    })),
-}))
-
 describe('aiProvider', () => {
     let originalGeminiKey: string | undefined
     let originalOpenRouterKey: string | undefined
@@ -25,7 +8,8 @@ describe('aiProvider', () => {
     beforeEach(() => {
         originalGeminiKey = process.env.GEMINI_API_KEY
         originalOpenRouterKey = process.env.OPENROUTER_API_KEY
-        vi.resetAllMocks()
+        vi.spyOn(console, 'log').mockImplementation(() => { })
+        vi.spyOn(console, 'error').mockImplementation(() => { })
     })
 
     afterEach(() => {
@@ -39,6 +23,7 @@ describe('aiProvider', () => {
         } else {
             delete process.env.OPENROUTER_API_KEY
         }
+        vi.restoreAllMocks()
     })
 
     describe('isAIAvailable', () => {
