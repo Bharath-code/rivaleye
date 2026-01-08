@@ -4,7 +4,7 @@ import { GoogleGenAI } from "@google/genai";
  * AI Provider Module
  *
  * Unified interface for AI generation with fallback:
- * 1. Gemini 2.0 Flash (primary - free tier)
+ * 1. Gemini 3 Flash (primary - free tier)
  * 2. OpenRouter (fallback - free models)
  */
 

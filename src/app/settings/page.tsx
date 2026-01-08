@@ -36,8 +36,10 @@ export default function SettingsPage() {
 
     // Slack webhook state
     const [slackUrl, setSlackUrl] = useState("");
+    const [originalSlackUrl, setOriginalSlackUrl] = useState("");
     const [isTestingSlack, setIsTestingSlack] = useState(false);
     const [slackTestResult, setSlackTestResult] = useState<"success" | "error" | null>(null);
+    const [slackSaveStatus, setSlackSaveStatus] = useState<"idle" | "success" | "error">("idle");
 
     useEffect(() => {
         fetchSettings();
@@ -53,7 +55,9 @@ export default function SettingsPage() {
             }
 
             setSettings(data.settings);
-            setSlackUrl(data.settings.slack_webhook_url || "");
+            const webhookValue = data.settings.slack_webhook_url || "";
+            setSlackUrl(webhookValue);
+            setOriginalSlackUrl(webhookValue);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load settings");
         } finally {
@@ -90,11 +94,31 @@ export default function SettingsPage() {
     };
 
     const handleSlackSave = async () => {
-        await updateSettings({ slack_webhook_url: slackUrl || null });
+        setSlackSaveStatus("idle");
+        try {
+            const res = await fetch("/api/settings", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slack_webhook_url: slackUrl || null }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            setSettings(data.settings);
+            setOriginalSlackUrl(slackUrl); // Update baseline
+            setSlackTestResult(null); // Clear test result
+            setSlackSaveStatus("success");
+            setTimeout(() => setSlackSaveStatus("idle"), 3000);
+        } catch {
+            setSlackSaveStatus("error");
+        }
     };
 
+    // Check if URL is a full valid webhook (not masked)
+    const isValidWebhookUrl = slackUrl.startsWith("https://hooks.slack.com/");
+
     const testSlackWebhook = async () => {
-        if (!slackUrl) return;
+        if (!slackUrl || !isValidWebhookUrl) return;
 
         setIsTestingSlack(true);
         setSlackTestResult(null);
@@ -302,7 +326,7 @@ export default function SettingsPage() {
                                     <Button
                                         variant="outline"
                                         onClick={testSlackWebhook}
-                                        disabled={!slackUrl || isTestingSlack}
+                                        disabled={!isValidWebhookUrl || isTestingSlack}
                                         className="gap-2"
                                     >
                                         {isTestingSlack ? (
@@ -318,16 +342,28 @@ export default function SettingsPage() {
                                     </Button>
                                     <Button
                                         onClick={handleSlackSave}
-                                        disabled={isSaving}
-                                        className="glow-emerald"
+                                        disabled={isSaving || slackUrl === originalSlackUrl}
+                                        className="glow-emerald gap-2"
                                     >
                                         {isSaving ? (
                                             <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : slackSaveStatus === "success" ? (
+                                            <><CheckCircle2 className="w-4 h-4" /> Saved!</>
                                         ) : (
                                             "Save"
                                         )}
                                     </Button>
                                 </div>
+
+                                {slackSaveStatus === "error" && (
+                                    <p className="text-sm text-red-400">Failed to save. Please try again.</p>
+                                )}
+
+                                {slackUrl && !isValidWebhookUrl && (
+                                    <p className="text-sm text-muted-foreground">
+                                        ℹ️ Re-enter your full webhook URL to test the connection.
+                                    </p>
+                                )}
 
                                 {slackTestResult && (
                                     <p className={`text-sm ${slackTestResult === "success" ? "text-emerald-400" : "text-red-400"

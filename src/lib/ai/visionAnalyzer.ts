@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 /**
  * Vision Analyzer Module
  *
- * Uses Gemini vision to analyze competitor page screenshots
+ * Uses Gemini 3 Flash vision to analyze competitor page screenshots
  * and extract comprehensive competitive intelligence.
  */
 
@@ -179,7 +179,7 @@ async function compressScreenshot(buffer: Buffer): Promise<Buffer> {
 }
 
 /**
- * Analyze a screenshot using Gemini vision
+ * Analyze a screenshot using Gemini 3 Flash
  */
 export async function analyzeScreenshot(
     screenshotBuffer: Buffer,
@@ -266,7 +266,7 @@ export async function analyzeScreenshot(
             success: true,
             analysis: parsed,
             rawAnalysis: rawText,
-            model: "gemini-2.0-flash",
+            model: "Gemini 3 Flash",
             timestamp: new Date().toISOString(),
             screenshotSize: compressedBuffer.length,
         };

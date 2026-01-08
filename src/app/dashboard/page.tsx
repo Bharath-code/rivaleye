@@ -748,7 +748,10 @@ export default function Dashboard() {
                                         >
                                             <CardHeader className="pb-2">
                                                 <div className="flex items-start justify-between">
-                                                    <CardTitle className="text-base font-medium">
+                                                    <CardTitle
+                                                        className="text-base font-medium cursor-pointer hover:text-emerald-400 transition-colors"
+                                                        onClick={() => router.push(`/dashboard/competitors/${competitor.id}`)}
+                                                    >
                                                         {competitor.name}
                                                     </CardTitle>
                                                     <div className="flex items-center gap-1">

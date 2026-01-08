@@ -151,6 +151,74 @@ export async function POST(request: Request) {
         // Insert into analyses table
         await supabase.from("analyses").insert(analysisRecord);
 
+        // ── Save to pricing_snapshots for Market Radar ───────────────────────────
+        // Ensure a pricing_context exists for this competitor (default: global)
+        let contextId: string | null = null;
+
+        const { data: existingContext } = await supabase
+            .from("pricing_contexts")
+            .select("id")
+            .eq("competitor_id", competitorId)
+            .eq("key", "global")
+            .single();
+
+        if (existingContext) {
+            contextId = existingContext.id;
+        } else {
+            // Create default global context
+            const { data: newContext } = await supabase
+                .from("pricing_contexts")
+                .insert({
+                    competitor_id: competitorId,
+                    key: "global",
+                    country: null,
+                    currency: analysis.analysis.pricing?.currency || "USD",
+                    locale: "en-US",
+                    timezone: "UTC",
+                    requires_browser: true,
+                })
+                .select("id")
+                .single();
+
+            contextId = newContext?.id || null;
+        }
+
+        // Save pricing snapshot if context exists and we have pricing data
+        if (contextId && analysis.analysis.pricing?.plans?.length > 0) {
+            const pricingSchema = {
+                currency: analysis.analysis.pricing?.currency || "USD",
+                plans: analysis.analysis.pricing.plans.map((p, idx) => ({
+                    id: `plan-${idx}`,
+                    name: p.name,
+                    position: idx,
+                    price_raw: p.price,
+                    price_visible: !!p.price,
+                    billing: p.period?.includes("year") ? "yearly" : "monthly",
+                    cta: "",
+                    badges: p.highlight ? [p.highlight] : [],
+                    limits: {},
+                    features: p.features || [],
+                })),
+                has_free_tier: analysis.analysis.pricing.plans.some(p =>
+                    p.price?.toLowerCase().includes("free") || p.price === "$0"
+                ),
+                highlighted_plan: analysis.analysis.pricing.plans.find(p => p.highlight)?.name || null,
+            };
+
+            await supabase.from("pricing_snapshots").insert({
+                competitor_id: competitorId,
+                pricing_context_id: contextId,
+                source: "playwright",
+                currency_detected: pricingSchema.currency,
+                pricing_schema: pricingSchema,
+                dom_hash: currentHash,
+                screenshot_path: screenshotPath,
+                taken_at: analysis.timestamp,
+            });
+
+            console.log(`[Vision] Saved pricing snapshot for Market Radar`);
+        }
+
         // If there are changes, create an alert
         if (hasChanged && previousAnalysis) {
             const changeDetails = detectSpecificChanges(

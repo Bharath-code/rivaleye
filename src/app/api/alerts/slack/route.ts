@@ -11,8 +11,20 @@ import { pushToSlack } from "@/lib/alerts/slackIntegration";
  */
 export async function POST(req: NextRequest) {
     try {
-        const { alertId } = await req.json();
+        const body = await req.json();
 
+        // Test mode: send a test message directly (for Settings UI)
+        if (body.test && body.webhookUrl) {
+            const result = await pushToSlack({
+                title: "🧪 Test Alert from RivalEye",
+                description: "Your Slack integration is working perfectly! You'll receive alerts here when competitors make pricing changes.",
+                competitorName: "Test Competitor",
+                webhookUrl: body.webhookUrl,
+            });
+            return NextResponse.json(result);
+        }
+
+        const alertId = body.alertId;
         if (!alertId) {
             return NextResponse.json({ error: "Missing alertId" }, { status: 400 });
         }
