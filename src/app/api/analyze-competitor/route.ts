@@ -152,27 +152,25 @@ export async function POST(request: Request) {
         await supabase.from("analyses").insert(analysisRecord);
 
         // ── Save to pricing_snapshots for Market Radar ───────────────────────────
-        // Ensure a pricing_context exists for this competitor (default: global)
+        // Get or create the global pricing context (shared across all competitors)
         let contextId: string | null = null;
 
         const { data: existingContext } = await supabase
             .from("pricing_contexts")
             .select("id")
-            .eq("competitor_id", competitorId)
             .eq("key", "global")
             .single();
 
         if (existingContext) {
             contextId = existingContext.id;
         } else {
-            // Create default global context
+            // Create default global context if it doesn't exist
             const { data: newContext } = await supabase
                 .from("pricing_contexts")
                 .insert({
-                    competitor_id: competitorId,
                     key: "global",
                     country: null,
-                    currency: analysis.analysis.pricing?.currency || "USD",
+                    currency: "USD",
                     locale: "en-US",
                     timezone: "UTC",
                     requires_browser: true,
