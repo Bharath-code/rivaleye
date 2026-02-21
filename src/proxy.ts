@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Next.js Middleware — Auth Guard
+ * Next.js Proxy — Auth Guard (formerly Middleware, renamed in Next.js 16)
  *
  * Protects /dashboard/* and /api/* (except public routes)
  * by checking for valid Supabase session cookies.
@@ -42,7 +42,7 @@ function isPublicRoute(pathname: string): boolean {
     return false;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // Skip public routes

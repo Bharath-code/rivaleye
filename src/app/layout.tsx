@@ -26,15 +26,58 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "RivalEye — Competitive Intelligence That Thinks",
+  title: {
+    default: "RivalEye — Competitive Intelligence That Thinks",
+    template: "%s | RivalEye",
+  },
   description:
     "Monitor competitor pricing pages. Get AI-powered insights when something changes. Know what matters before it's too late.",
-  keywords: ["competitive intelligence", "competitor monitoring", "pricing alerts", "SaaS tools"],
+  keywords: [
+    "competitive intelligence",
+    "competitor monitoring",
+    "pricing alerts",
+    "SaaS tools",
+    "pricing tracking",
+    "AI insights",
+  ],
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://rivaleye.app"
+  ),
   openGraph: {
     title: "RivalEye — Competitive Intelligence That Thinks",
-    description: "Monitor competitor pricing. Get AI insights. Act faster.",
+    description:
+      "Monitor competitor pricing. Get AI insights. Act faster than your competition.",
     type: "website",
+    siteName: "RivalEye",
+    url: "/",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "RivalEye — Competitive Intelligence That Thinks",
+      },
+    ],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "RivalEye — Competitive Intelligence That Thinks",
+    description:
+      "Monitor competitor pricing. Get AI insights. Act faster than your competition.",
+    images: ["/og-image.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -50,12 +93,23 @@ export default function RootLayout({
       className={`dark ${outfit.variable} ${spaceMono.variable} ${inter.variable}`}
     >
       <body className="bg-background text-foreground antialiased min-h-screen flex flex-col noise-overlay">
+        {/* Skip to content — accessibility */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:bg-emerald-500 focus:text-black focus:px-4 focus:py-2 focus:rounded-md focus:text-sm focus:font-medium"
+        >
+          Skip to content
+        </a>
         <AnalyticsProvider>
           <SmoothScroll>
-            {children}
+            <main id="main-content">
+              {children}
+            </main>
           </SmoothScroll>
         </AnalyticsProvider>
         <Toaster position="bottom-right" />
+        {/* Aria live region for dynamic announcements */}
+        <div aria-live="polite" aria-atomic="true" className="sr-only" id="announcer" />
 
         {/* Cloudflare Web Analytics */}
         {cfToken && (

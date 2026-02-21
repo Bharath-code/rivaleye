@@ -170,6 +170,20 @@ export default function Dashboard() {
     }), [fetchData]);
     useKeyboardShortcuts(shortcuts);
 
+    // First-visit shortcut onboarding
+    useEffect(() => {
+        const key = "rivaleye:shortcuts-shown";
+        if (!localStorage.getItem(key)) {
+            localStorage.setItem(key, "1");
+            setTimeout(() => {
+                toast("Pro tip", {
+                    description: "Press N to add a competitor, R to refresh data",
+                    duration: 6000,
+                });
+            }, 2000);
+        }
+    }, []);
+
     // ══════════════════════════════════════════════════════════════════════════
     // HANDLERS
     // ══════════════════════════════════════════════════════════════════════════
