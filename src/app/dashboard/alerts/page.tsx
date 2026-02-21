@@ -149,8 +149,36 @@ export default function AlertsPage() {
         return (
             <div className="flex-1 flex flex-col min-h-screen">
                 <Header />
-                <main className="flex-1 flex items-center justify-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                <main className="flex-1 pt-24 pb-12 px-6">
+                    <div className="max-w-4xl mx-auto">
+                        {/* Header skeleton */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="space-y-2">
+                                <div className="h-8 w-48 bg-muted/40 rounded-md animate-pulse" />
+                                <div className="h-4 w-32 bg-muted/40 rounded-md animate-pulse" />
+                            </div>
+                            <div className="h-9 w-28 bg-muted/40 rounded-md animate-pulse" />
+                        </div>
+                        {/* Filter bar skeleton */}
+                        <div className="flex gap-2 mb-6">
+                            {[...Array(4)].map((_, i) => (
+                                <div key={i} className="h-8 w-20 bg-muted/40 rounded-full animate-pulse" />
+                            ))}
+                        </div>
+                        {/* Alert card skeletons */}
+                        <div className="space-y-3">
+                            {[...Array(5)].map((_, i) => (
+                                <div key={i} className="flex items-start gap-4 p-4 rounded-xl border border-border/50 bg-muted/10">
+                                    <div className="w-10 h-10 rounded-full bg-muted/40 animate-pulse shrink-0" />
+                                    <div className="flex-1 space-y-2">
+                                        <div className="h-4 w-3/4 bg-muted/40 rounded-md animate-pulse" />
+                                        <div className="h-3 w-1/2 bg-muted/40 rounded-md animate-pulse" />
+                                    </div>
+                                    <div className="h-6 w-16 bg-muted/40 rounded-full animate-pulse" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </main>
                 <Footer />
             </div>
@@ -161,12 +189,16 @@ export default function AlertsPage() {
         return (
             <div className="flex-1 flex flex-col min-h-screen">
                 <Header />
-                <main className="flex-1 flex items-center justify-center">
-                    <div className="text-center">
-                        <p className="text-red-500 mb-4">{error}</p>
+                <main className="flex-1 flex items-center justify-center px-6">
+                    <div className="text-center max-w-sm p-8 rounded-2xl glass-card">
+                        <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+                            <span className="text-red-400 text-xl">!</span>
+                        </div>
+                        <p className="text-foreground font-medium mb-2">Something went wrong</p>
+                        <p className="text-sm text-muted-foreground mb-4">{error}</p>
                         <button
                             onClick={() => fetchAlerts()}
-                            className="text-primary underline"
+                            className="text-emerald-400 hover:underline text-sm font-medium"
                         >
                             Try Again
                         </button>

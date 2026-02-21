@@ -5,6 +5,7 @@ import Footer from "./components/Footer";
 import { Button } from "@/components/ui/button";
 import { DemoAlertPreview } from "@/components/demo";
 import { HeroCTA, DemoCTA, PricingFreeCTA, PricingProCTA, FooterCTA } from "@/components/marketing/TrackedCTA";
+import { BillingToggle } from "@/components/marketing/BillingToggle";
 import Link from "next/link";
 import {
   Eye,
@@ -20,7 +21,7 @@ import {
   MapPin,
   Users,
 } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -29,6 +30,7 @@ gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
   const container = useRef(null);
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
 
   useGSAP(() => {
     // Reveal all sections on scroll
@@ -397,9 +399,13 @@ export default function Home() {
           <h2 className="font-display text-4xl text-foreground mb-4 gsap-reveal">
             Strategic Investment.
           </h2>
-          <p className="text-muted-foreground mb-12 gsap-reveal">
+          <p className="text-muted-foreground mb-8 gsap-reveal">
             Pick the plan that fits your execution speed.
           </p>
+
+          <div className="mb-12 gsap-reveal">
+            <BillingToggle onToggle={(p) => setBillingPeriod(p)} />
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
             {/* Free */}
@@ -436,9 +442,24 @@ export default function Home() {
               </div>
               <div className="font-mono text-[10px] text-emerald-400 mb-2 uppercase tracking-widest">Tactical Tier</div>
               <div className="text-4xl font-bold text-foreground mb-2">
-                $49
-                <span className="text-lg font-normal text-muted-foreground">/mo</span>
+                {billingPeriod === "annual" ? (
+                  <>
+                    <span className="text-emerald-400">$39</span>
+                    <span className="text-lg font-normal text-muted-foreground">/mo</span>
+                    <span className="text-sm font-normal text-muted-foreground ml-2 line-through">$49</span>
+                  </>
+                ) : (
+                  <>
+                    $49
+                    <span className="text-lg font-normal text-muted-foreground">/mo</span>
+                  </>
+                )}
               </div>
+              {billingPeriod === "annual" && (
+                <p className="text-xs text-emerald-400 font-medium mb-2">
+                  Billed at $468/yr — Save $120
+                </p>
+              )}
               <p className="text-sm text-muted-foreground mb-8">For founders serious about competition.</p>
 
               <ul className="space-y-4 text-sm mb-10">

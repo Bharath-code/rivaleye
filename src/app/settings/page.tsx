@@ -40,6 +40,7 @@ export default function SettingsPage() {
     const [isTestingSlack, setIsTestingSlack] = useState(false);
     const [slackTestResult, setSlackTestResult] = useState<"success" | "error" | null>(null);
     const [slackSaveStatus, setSlackSaveStatus] = useState<"idle" | "success" | "error">("idle");
+    const [userPlan, setUserPlan] = useState<"free" | "pro" | "enterprise">("free");
 
     useEffect(() => {
         fetchSettings();
@@ -58,6 +59,17 @@ export default function SettingsPage() {
             const webhookValue = data.settings.slack_webhook_url || "";
             setSlackUrl(webhookValue);
             setOriginalSlackUrl(webhookValue);
+
+            // Fetch plan info
+            try {
+                const userRes = await fetch("/api/user");
+                if (userRes.ok) {
+                    const userData = await userRes.json();
+                    setUserPlan(userData.plan || "free");
+                }
+            } catch {
+                // Non-critical, default to free
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load settings");
         } finally {
@@ -149,8 +161,34 @@ export default function SettingsPage() {
         return (
             <div className="flex-1 flex flex-col min-h-screen">
                 <Header />
-                <main className="flex-1 flex items-center justify-center">
-                    <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+                <main className="flex-1 pt-24 pb-12 px-6">
+                    <div className="container max-w-2xl mx-auto px-4 py-8">
+                        <div className="mb-8 space-y-2">
+                            <div className="h-4 w-32 bg-muted/40 rounded-md animate-pulse" />
+                            <div className="h-8 w-40 bg-muted/40 rounded-md animate-pulse" />
+                            <div className="h-4 w-64 bg-muted/40 rounded-md animate-pulse" />
+                        </div>
+                        <div className="space-y-6">
+                            {[...Array(2)].map((_, i) => (
+                                <div key={i} className="rounded-xl border border-border/50 p-6 space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-muted/40 animate-pulse" />
+                                        <div className="space-y-2">
+                                            <div className="h-5 w-36 bg-muted/40 rounded-md animate-pulse" />
+                                            <div className="h-3 w-52 bg-muted/40 rounded-md animate-pulse" />
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <div className="h-4 w-32 bg-muted/40 rounded-md animate-pulse" />
+                                            <div className="h-3 w-48 bg-muted/40 rounded-md animate-pulse" />
+                                        </div>
+                                        <div className="h-6 w-10 bg-muted/40 rounded-full animate-pulse" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </main>
                 <Footer />
             </div>
@@ -208,6 +246,58 @@ export default function SettingsPage() {
                     )}
 
                     <div className="space-y-6">
+                        {/* Plan & Billing */}
+                        <Card className="glass-card">
+                            <CardHeader>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                                        <Bell className="w-5 h-5 text-emerald-400" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <CardTitle className="text-lg">Plan & Billing</CardTitle>
+                                        <CardDescription>
+                                            Your current subscription
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                            {userPlan === "free" ? "Free" : userPlan === "pro" ? "Pro" : "Enterprise"}
+                                        </span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {userPlan === "pro"
+                                                ? "$49/mo · Active"
+                                                : "1 competitor · Limited features"}
+                                        </span>
+                                    </div>
+                                    {userPlan === "pro" ? (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={async () => {
+                                                const res = await fetch("/api/customer-portal");
+                                                if (res.ok) {
+                                                    const data = await res.json();
+                                                    if (data.url) window.open(data.url, "_blank");
+                                                }
+                                            }}
+                                        >
+                                            Manage Billing
+                                        </Button>
+                                    ) : (
+                                        <Link href="/#pricing">
+                                            <Button variant="outline" size="sm" className="text-emerald-400 border-emerald-500/20 hover:bg-emerald-500 hover:text-black">
+                                                Upgrade to Pro
+                                            </Button>
+                                        </Link>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
                         {/* Email Preferences */}
                         <Card className="glass-card">
                             <CardHeader>
