@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { getUserId } from "@/lib/auth";
 import { analyzeCompetitorTask } from "@/trigger/analyzeCompetitor";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
+import { validateCompetitorUrl } from "@/lib/urlValidator";
 
 /**
  * Competitors API
@@ -91,6 +93,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        // Rate limit
+        const rateCheck = checkRateLimit(`competitors:${userId}`, RATE_LIMITS.competitors);
+        if (!rateCheck.allowed) {
+            return NextResponse.json(
+                { error: "Too many requests. Please slow down." },
+                { status: 429, headers: { "Retry-After": String(Math.ceil(rateCheck.resetMs / 1000)) } }
+            );
+        }
+
         await ensureUserExists(userId);
 
         const body = await request.json();
@@ -103,15 +114,15 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Validate URL
-        try {
-            new URL(url);
-        } catch {
+        // Validate URL (SSRF protection)
+        const urlValidation = validateCompetitorUrl(url);
+        if (!urlValidation.valid) {
             return NextResponse.json(
-                { error: "Invalid URL format" },
+                { error: urlValidation.error },
                 { status: 400 }
             );
         }
+        const safeUrl = urlValidation.sanitizedUrl!;
 
         const supabase = createServerClient();
 
@@ -143,7 +154,7 @@ export async function POST(request: NextRequest) {
             .insert({
                 user_id: userId,
                 name,
-                url,
+                url: safeUrl,
                 status: "active",
                 failure_count: 0,
             })

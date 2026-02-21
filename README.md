@@ -1,196 +1,111 @@
-# Dodo Payments Next.js Boilerplate
+# RivalEye
 
-A minimal Nextjs boilerplate for integrating [Dodo Payments](https://dodopayments.com/) into your [Next.js](https://nextjs.org/) application.
+**Competitive intelligence that thinks.** Monitor competitor pricing, tech stack, and branding across 4 global regions. When they move, get an AI tactical brief — not just a notification.
 
-## Features
+## What It Does
 
-- **Quick Setup** - Get started in under 5 minutes
-- **Payment Integration** - Pre-configured checkout flow using `@dodopayments/nextjs`
-- **Modern UI** - Clean, dark-themed pricing page with Tailwind CSS
-- **Webhook Handler** - Ready-to-use webhook endpoint for payment events
-- **Customer Portal** - One-click subscription management
-- **TypeScript** - Fully typed with minimal, focused types
-- **Pre-filled Checkout** - Demonstrates passing customer data to improve UX
+- **Price Monitoring** — Detects increases, decreases, and sneaky regional discounts
+- **Tech Stack Detection** — Alerts when competitors add Stripe, switch to Next.js, adopt new analytics
+- **Branding Analysis** — Catches color, font, and logo changes that signal repositioning
+- **Geo-Aware Pricing** — Monitors from 4 regions (US, EU, India, Global) to uncover hidden strategies
+- **AI Tactical Briefs** — Every change comes with what happened, why it matters, and what to do next
+- **Core Web Vitals** — Track competitor performance and capitalize on their UX gaps
 
-## Prerequisites
+## Tech Stack
 
-Before you begin, make sure you have:
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 16, React 19, Tailwind CSS 4, GSAP, Radix UI |
+| Backend | Next.js API Routes, Supabase (Postgres + RLS + Auth) |
+| AI | Google Gemini (Vision), OpenRouter |
+| Crawling | Firecrawl, Playwright, Cheerio (3-scraper fallback) |
+| Jobs | Trigger.dev |
+| Billing | Dodo Payments |
+| Alerts | Resend (email), Slack webhooks |
+| Analytics | PostHog, Cloudflare Web Analytics |
+| Storage | Cloudflare R2 (screenshots) |
 
-- **Node.js 20.9+** (required for Next.js 16)
-- **Dodo Payments account** (to access API and Webhook Keys from dashboard)
+## Getting Started
 
-## Quick Start
+### Prerequisites
 
-### 1. Clone the Repository
+- Node.js 20.9+
+- Supabase project
+- API keys for Firecrawl, Google Gemini, Dodo Payments
+
+### Setup
 
 ```bash
-git clone https://github.com/dodopayments/dodo-nextjs-minimal-boilerplate.git
-cd dodo-nextjs-minimal-boilerplate
-```
-
-### 2. Install Dependencies
-
-```bash
+# Install dependencies
 npm install
-```
 
-### 3. Get API Credentials
-
-Sign up at [Dodo Payments](https://dodopayments.com/) and get your credentials from the dashboard:
-
-- **API Key:** [Dashboard → Developer → API Keys](https://app.dodopayments.com/developer/api-keys)
-- **Webhook Key:** [Dashboard → Developer → Webhooks](https://app.dodopayments.com/developer/webhooks)
-
-> Make sure you're in **Test Mode** while developing!
-
-### 4. Configure Environment Variables
-
-Create a `.env` file in the root directory:
-
-```bash
+# Copy environment config
 cp .env.example .env
-```
 
-Update the values with your Dodo Payments credentials:
+# Run the database schema
+# → Copy supabase/schema.sql into Supabase SQL Editor
 
-```env
-DODO_PAYMENTS_API_KEY=your_api_key_here
-DODO_PAYMENTS_WEBHOOK_KEY=your_webhook_signing_key_here
-DODO_PAYMENTS_RETURN_URL=http://localhost:3000
-DODO_PAYMENTS_ENVIRONMENT=test_mode
-```
-
-### 5. Add Your Products
-
-Update `src/lib/products.ts` with your actual product IDs from Dodo Payments:
-
-```typescript
-export const products: Product[] = [
-  {
-    product_id: "pdt_001", // Replace with your product ID
-    name: "Basic Plan",
-    description: "Get access to basic features and support",
-    price: 9999, // in cents
-    features: [
-      "Access to basic features",
-      "Email support",
-      "1 Team member",
-      "Basic analytics",
-    ],
-  },
-  // ... add more products
-];
-```
-
-### 6. Run the Development Server
-
-```bash
+# Start dev server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see your pricing page!
+### Environment Variables
 
-## Project Structure
+See `.env.example` for all required keys. At minimum you need:
+
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `FIRECRAWL_API_KEY`
+- `DODO_PAYMENTS_API_KEY` / `DODO_PAYMENTS_WEBHOOK_KEY`
+
+## Architecture
 
 ```
 src/
 ├── app/
-│   ├── api/
-│   │   ├── checkout/          # Checkout session handler
-│   │   ├── customer-portal/   # Customer portal redirect
-│   │   └── webhook/           # Webhook event handler
-│   ├── components/
-│   │   ├── Footer.tsx         # Reusable footer
-│   │   ├── Header.tsx         # Navigation header
-│   │   └── ProductCard.tsx    # Product pricing card
-│   ├── globals.css            # Global styles
-│   ├── layout.tsx             # Root layout
-│   └── page.tsx               # Pricing page (home)
-└── lib/
-    └── products.ts            # Product definitions
+│   ├── api/            # 14 API routes (competitors, alerts, billing, analysis)
+│   ├── dashboard/      # Main dashboard with market radar, competitor cards, alerts
+│   ├── login/          # Auth page
+│   └── page.tsx        # Landing page
+├── components/
+│   ├── alerts/         # Alert summary, alert cards
+│   ├── charts/         # Market radar, pricing trends
+│   ├── onboarding/     # First-run wizard
+│   └── ui/             # Shadcn/Radix primitives
+├── lib/
+│   ├── ai/             # Vision analyzer, insight generator, AI provider
+│   ├── alerts/         # Email, Slack, branding/tech/performance alerts
+│   ├── billing/        # Feature flags, plan limits
+│   ├── crawler/        # Firecrawl, Playwright, Cheerio, geo-proxy, guardrails
+│   ├── diff/           # Pricing diff engine, meaningfulness checks, alert rules
+│   └── *.ts            # Auth, encryption, quotas, abuse detection
+└── trigger/            # Background jobs (daily analysis, pricing checks, retention)
 ```
 
-## Customization
+## Plans
 
-### Update Product Information
+| | Free | Pro ($49/mo) |
+|---|---|---|
+| Competitors | 1 | 5 |
+| Scans | Daily | Daily + on-demand |
+| Regions | 1 (Global) | 4 (US, EU, IN, Global) |
+| AI Tactical Briefs | — | ✓ |
+| Tech Stack Alerts | — | ✓ |
+| Branding Alerts | — | ✓ |
+| Core Web Vitals | — | ✓ |
+| Slack Integration | — | ✓ |
+| Alert History | 7 days | Unlimited |
 
-Edit `src/lib/products.ts` to modify:
-- Product IDs (from your Dodo dashboard)
-- Pricing
-- Features
-- Descriptions
-
-### Pre-fill Customer Data
-
-In `src/app/components/ProductCard.tsx`, replace the hardcoded values with your actual user data:
-
-```typescript
-customer: {
-  name: "John Doe",
-  email: "john@example.com",
-},
-```
-
-### Update Customer Portal Link
-
-In `src/app/components/Header.tsx`, replace the hardcoded customer ID:
-
-```typescript
-const CUSTOMER_ID = "cus_001"; // Replace with actual customer ID
-```
-
-## Webhook Events
-
-The boilerplate demonstrates handling two webhook events in `src/app/api/webhook/route.ts`:
-
-- `onSubscriptionActive` - Triggered when a subscription becomes active
-- `onPaymentSucceeded` - Triggered when a payment is successful
-
-Add your business logic inside these handlers:
-
-```typescript
-onSubscriptionActive: async (payload) => {
-  // Grant access to your product
-  // Update user database
-  // Send welcome email
-},
-```
-
-Add more webhook events as needed.
-
-For local development, you can use tools like [ngrok](https://ngrok.com/) to create a secure tunnel to your local server and use it as your webhook URL. Remember to update your `.env` file with the correct webhook verification key.
-
-## Deployment
-
-### Build for Production
+## Scripts
 
 ```bash
-npm run build
-npm start
+npm run dev          # Development server (Turbopack)
+npm run build        # Production build
+npm run test         # Run tests (Vitest)
+npm run test:coverage # Tests with coverage
+npm run lint         # ESLint
 ```
 
-### Deploy to Vercel
+## License
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/dodopayments/dodo-nextjs-minimal-boilerplate)
-
-Don't forget to add your environment variables in the Vercel dashboard!
-
-### Update Webhook URL
-
-After deploying, update your webhook URL in the [Dodo Payments Dashboard](https://app.dodopayments.com/developer/webhooks):
-
-```
-https://example.com/api/webhook
-```
-
-## Learn More
-
-- [Dodo Payments Documentation](https://docs.dodopayments.com/)
-- [Checkout Sessions Documentation](https://docs.dodopayments.com/developer-resources/checkout-sessions)
-- [Webhooks Documentation](https://docs.dodopayments.com/developer-resources/webhooks)
-
-## Support
-
-Need help? Reach out:
-- [Dodo Payments Discord](https://discord.gg/bYqAp4ayYh)
-- [GitHub Issues](https://github.com/dodopayments/dodo-nextjs-minimal-boilerplate/issues)
+Proprietary. All rights reserved.

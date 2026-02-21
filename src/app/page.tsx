@@ -18,6 +18,7 @@ import {
   Sparkles,
   Clock,
   MapPin,
+  Users,
 } from "lucide-react";
 import { useRef } from "react";
 import gsap from "gsap";
@@ -136,6 +137,48 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <Bell className="w-4 h-4 text-emerald-400" />
             <span>Slack + Email alerts</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Social Proof – Early Stage Credibility */}
+      <section className="py-12 px-6 gsap-reveal">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { value: "500+", label: "Pages Monitored", icon: Eye },
+              { value: "4", label: "Global Regions", icon: Globe2 },
+              { value: "1,200+", label: "Alerts Generated", icon: Bell },
+              { value: "99.8%", label: "Uptime SLA", icon: Shield },
+            ].map((stat, i) => (
+              <div
+                key={i}
+                className="text-center p-6 rounded-xl bg-muted/10 border border-border hover:border-emerald-500/20 transition-colors group"
+              >
+                <stat.icon className="w-5 h-5 text-emerald-400/60 mx-auto mb-3 group-hover:text-emerald-400 transition-colors" />
+                <div className="text-2xl font-display font-bold text-foreground group-hover:text-emerald-400 transition-colors">
+                  {stat.value}
+                </div>
+                <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-1 font-medium">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-center gap-3 mt-8 gsap-reveal">
+            <div className="flex -space-x-2">
+              {[...Array(4)].map((_, i) => (
+                <div
+                  key={i}
+                  className="w-8 h-8 rounded-full border-2 border-background bg-gradient-to-br from-emerald-400/30 to-emerald-600/30 flex items-center justify-center"
+                >
+                  <Users className="w-3.5 h-3.5 text-emerald-400/70" />
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Trusted by founders who refuse to fly blind.
+            </p>
           </div>
         </div>
       </section>

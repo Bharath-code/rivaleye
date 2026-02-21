@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, ExternalLink, RefreshCw, Clock, AlertCircle, CheckCircle2, Loader2, Sparkles, LineChart, History, Bell, Settings, Pencil, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, RefreshCw, Loader2, Sparkles, History, Settings, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -17,6 +17,17 @@ import type { PricingDiffType, AlertSeverity } from "@/lib/types";
 import { MarketRadar, PricingTrendChart } from "@/components/charts";
 import { cn } from "@/lib/utils";
 import { analytics } from "@/components/providers/AnalyticsProvider";
+import { toast } from "sonner";
+import {
+    CompetitorCard,
+    AnalysisResultModal,
+    DeleteCompetitorDialog,
+    DashboardSkeleton,
+} from "@/components/dashboard";
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TYPES
+// ══════════════════════════════════════════════════════════════════════════════
 
 interface Competitor {
     id: string;
@@ -35,8 +46,8 @@ interface Alert {
     ai_insight: string;
     is_meaningful: boolean;
     is_read?: boolean;
-    type?: "price_increase" | "price_decrease" | "plan_added" | "plan_removed" | "free_tier_removed" | "free_tier_added" | "plan_promoted" | "cta_changed" | "regional_difference";
-    severity?: "high" | "medium" | "low";
+    type?: string;
+    severity?: string;
     title?: string;
     description?: string;
     details?: {
@@ -46,53 +57,55 @@ interface Alert {
         aiExplanation?: string;
     };
     created_at: string;
-    competitors?: {
-        name: string;
-    };
+    competitors?: { name: string };
 }
 
-function formatRelativeTime(dateString: string | null): string {
-    if (!dateString) return "Never";
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
-}
+// ══════════════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
 
 export default function Dashboard() {
     const router = useRouter();
+
+    // Add competitor
     const [isAddingCompetitor, setIsAddingCompetitor] = useState(false);
     const [competitorName, setCompetitorName] = useState("");
     const [competitorUrl, setCompetitorUrl] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
 
+    // Data
     const [competitors, setCompetitors] = useState<Competitor[]>([]);
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    // checkingId removed - merged into analyzingId
     const [checkSuccess, setCheckSuccess] = useState<string | null>(null);
     const [userPlan, setUserPlan] = useState<"free" | "pro" | "enterprise">("free");
     const [radarData, setRadarData] = useState<any[]>([]);
-    const [isRadarLoading, setIsRadarLoading] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
+
+    // History dialog
     const [selectedHistoryComp, setSelectedHistoryComp] = useState<Competitor | null>(null);
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
     const [historyChartData, setHistoryChartData] = useState<any[]>([]);
-    const [showOnboarding, setShowOnboarding] = useState(false);
 
-    // Edit competitor state
+    // Edit dialog
     const [editingCompetitor, setEditingCompetitor] = useState<Competitor | null>(null);
     const [editName, setEditName] = useState("");
     const [editUrl, setEditUrl] = useState("");
     const [isEditSubmitting, setIsEditSubmitting] = useState(false);
     const [editError, setEditError] = useState<string | null>(null);
+
+    // Delete dialog
+    const [deletingCompetitor, setDeletingCompetitor] = useState<Competitor | null>(null);
+
+    // Analysis
+    const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+    const [analysisResult, setAnalysisResult] = useState<any | null>(null);
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // DATA FETCHING
+    // ══════════════════════════════════════════════════════════════════════════
 
     const fetchData = useCallback(async () => {
         try {
@@ -117,20 +130,17 @@ export default function Dashboard() {
             setUserPlan(competitorsData.plan || "free");
             setAlerts(alertsData.alerts || []);
 
-            // Show onboarding if no competitors
             if ((competitorsData.competitors || []).length === 0) {
                 setShowOnboarding(true);
             }
 
-            // Handle Radar Data (Pro Only)
+            // Market Radar (Pro Only)
             if (competitorsData.plan !== "free") {
-                setIsRadarLoading(true);
                 const radarRes = await fetch("/api/market-radar");
                 if (radarRes.ok) {
                     const radarJson = await radarRes.json();
                     setRadarData(radarJson.data || []);
                 }
-                setIsRadarLoading(false);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load data");
@@ -141,15 +151,20 @@ export default function Dashboard() {
 
     useEffect(() => {
         fetchData();
-        // Track dashboard visit
-        const userCreatedAt = localStorage.getItem('userCreatedAt');
+        const userCreatedAt = localStorage.getItem("userCreatedAt");
         if (userCreatedAt) {
-            const daysSinceSignup = Math.floor((Date.now() - new Date(userCreatedAt).getTime()) / (1000 * 60 * 60 * 24));
+            const daysSinceSignup = Math.floor(
+                (Date.now() - new Date(userCreatedAt).getTime()) / (1000 * 60 * 60 * 24)
+            );
             analytics.dashboardVisit(daysSinceSignup);
         } else {
             analytics.dashboardVisit(0);
         }
     }, [fetchData]);
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // HANDLERS
+    // ══════════════════════════════════════════════════════════════════════════
 
     const handleAddCompetitor = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -197,75 +212,6 @@ export default function Dashboard() {
         setCompetitors((prev) => [data.competitor, ...prev]);
     };
 
-    const handleOnboardingSkip = () => {
-        setShowOnboarding(false);
-    };
-
-    const handleViewHistory = async (comp: Competitor) => {
-        if (userPlan === "free") {
-            window.open("/#pricing", "_blank");
-            return;
-        }
-
-        setSelectedHistoryComp(comp);
-        setIsHistoryLoading(true);
-        try {
-            const res = await fetch(`/api/competitors/${comp.id}/history`);
-            if (res.ok) {
-                const data = await res.json();
-
-                // Process history data for the chart
-                // We take the cheapest plan price for the trend
-                const chartPoints = data.history.map((h: any) => {
-                    const plans = h.plans || [];
-                    const prices = plans
-                        .map((p: any) => {
-                            const priceStr = p.price_raw?.replace(/[^0-9.]/g, '');
-                            return parseFloat(priceStr || '0');
-                        })
-                        .filter((v: number) => v > 0);
-
-                    const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-
-                    return {
-                        date: h.date,
-                        price: minPrice
-                    };
-                }).filter((p: any) => p.price > 0);
-
-                setHistoryChartData(chartPoints);
-            }
-        } catch (err) {
-            console.error("Failed to load history:", err);
-        } finally {
-            setIsHistoryLoading(false);
-        }
-    };
-
-    // handleCheckNow removed - merged into handleAnalyze (vision-based scan)
-
-
-    const [analyzingId, setAnalyzingId] = useState<string | null>(null);
-    const [analysisResult, setAnalysisResult] = useState<{
-        companyName?: string;
-        tagline?: string;
-        pricing?: {
-            plans?: Array<{ name: string; price: string; period?: string; credits?: string; features?: string[] }>;
-            promotions?: string[];
-        };
-        features?: {
-            highlighted?: string[];
-            differentiators?: string[];
-        };
-        positioning?: {
-            targetAudience?: string;
-            valueProposition?: string;
-            socialProof?: string[];
-        };
-        insights?: string[];
-        summary?: string;
-    } | null>(null);
-
     const handleAnalyze = async (competitorId: string) => {
         setAnalyzingId(competitorId);
         setAnalysisResult(null);
@@ -280,7 +226,7 @@ export default function Dashboard() {
             const data = await res.json();
 
             if (!res.ok) {
-                alert(data.error || "Analysis failed");
+                toast.error(data.error || "Analysis failed");
                 return;
             }
 
@@ -293,13 +239,47 @@ export default function Dashboard() {
             setCheckSuccess(`${changeMsg} ${competitor?.name || "Page"} analyzed.`);
             setTimeout(() => setCheckSuccess(null), 5000);
         } catch (err) {
-            alert(err instanceof Error ? err.message : "Analysis failed");
+            toast.error(err instanceof Error ? err.message : "Analysis failed");
         } finally {
             setAnalyzingId(null);
         }
     };
 
-    // Edit competitor handler
+    const handleViewHistory = async (comp: Competitor) => {
+        if (userPlan === "free") {
+            window.open("/#pricing", "_blank");
+            return;
+        }
+
+        setSelectedHistoryComp(comp);
+        setIsHistoryLoading(true);
+        try {
+            const res = await fetch(`/api/competitors/${comp.id}/history`);
+            if (res.ok) {
+                const data = await res.json();
+                const chartPoints = data.history
+                    .map((h: any) => {
+                        const plans = h.plans || [];
+                        const prices = plans
+                            .map((p: any) => {
+                                const priceStr = p.price_raw?.replace(/[^0-9.]/g, "");
+                                return parseFloat(priceStr || "0");
+                            })
+                            .filter((v: number) => v > 0);
+                        const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+                        return { date: h.date, price: minPrice };
+                    })
+                    .filter((p: any) => p.price > 0);
+
+                setHistoryChartData(chartPoints);
+            }
+        } catch (err) {
+            console.error("Failed to load history:", err);
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    };
+
     const handleEditCompetitor = async () => {
         if (!editingCompetitor) return;
 
@@ -323,21 +303,16 @@ export default function Dashboard() {
                 return;
             }
 
-            // Update local state
             setCompetitors((prev) =>
-                prev.map((c) =>
-                    c.id === editingCompetitor.id ? data.competitor : c
-                )
+                prev.map((c) => (c.id === editingCompetitor.id ? data.competitor : c))
             );
 
-            // Show success message
             const message = data.historyReset
                 ? `✓ ${data.competitor.name} updated. Historical data has been reset.`
                 : `✓ ${data.competitor.name} updated successfully.`;
             setCheckSuccess(message);
             setTimeout(() => setCheckSuccess(null), 5000);
 
-            // Close dialog
             setEditingCompetitor(null);
             setEditName("");
             setEditUrl("");
@@ -355,14 +330,22 @@ export default function Dashboard() {
         setEditError(null);
     };
 
+    const handleDeleteComplete = (id: string) => {
+        setCompetitors((prev) => prev.filter((c) => c.id !== id));
+    };
+
     const urlIsChanging = editingCompetitor && editUrl !== editingCompetitor.url;
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // LOADING STATE
+    // ══════════════════════════════════════════════════════════════════════════
 
     if (isLoading) {
         return (
             <div className="flex-1 flex flex-col min-h-screen">
                 <Header />
-                <main className="flex-1 flex items-center justify-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                <main className="flex-1 pt-24 pb-12 px-6">
+                    <DashboardSkeleton />
                 </main>
                 <Footer />
             </div>
@@ -376,7 +359,6 @@ export default function Dashboard() {
                 <main className="flex-1 flex items-center justify-center">
                     <Card className="glass-card max-w-md">
                         <CardContent className="py-8 text-center">
-                            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
                             <p className="text-foreground mb-2">Something went wrong</p>
                             <p className="text-sm text-muted-foreground">{error}</p>
                             <Button onClick={() => fetchData()} className="mt-4">
@@ -390,6 +372,10 @@ export default function Dashboard() {
         );
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // RENDER
+    // ══════════════════════════════════════════════════════════════════════════
+
     return (
         <div className="flex-1 flex flex-col min-h-screen">
             <Header />
@@ -398,7 +384,7 @@ export default function Dashboard() {
             {showOnboarding && (
                 <OnboardingWizard
                     onComplete={handleOnboardingComplete}
-                    onSkip={handleOnboardingSkip}
+                    onSkip={() => setShowOnboarding(false)}
                 />
             )}
 
@@ -412,134 +398,17 @@ export default function Dashboard() {
             )}
 
             {/* Analysis Results Modal */}
-            {analysisResult && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <Card className="glass-card max-w-2xl w-full max-h-[80vh] overflow-auto">
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                <span>🔍</span>
-                                AI Analysis: {analysisResult.companyName}
-                            </CardTitle>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setAnalysisResult(null)}
-                            >
-                                ✕
-                            </Button>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            {/* Executive Summary */}
-                            {analysisResult.summary && (
-                                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
-                                    <p className="text-sm text-foreground">{analysisResult.summary}</p>
-                                </div>
-                            )}
+            <AnalysisResultModal
+                result={analysisResult}
+                onClose={() => setAnalysisResult(null)}
+            />
 
-                            {/* Tagline */}
-                            {analysisResult.tagline && (
-                                <p className="text-muted-foreground italic">"{analysisResult.tagline}"</p>
-                            )}
-
-                            {/* Pricing Plans */}
-                            {analysisResult.pricing?.plans && analysisResult.pricing.plans.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold mb-3 text-foreground">💰 Pricing Plans</h3>
-                                    <div className="grid gap-3">
-                                        {analysisResult.pricing.plans.map((plan: { name: string; price: string; period?: string; credits?: string; features?: string[] }, i: number) => (
-                                            <div key={i} className="border border-border/50 rounded-lg p-3 bg-surface-elevated/50">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <span className="font-medium text-foreground">{plan.name}</span>
-                                                    <span className="text-emerald-400 font-bold">{plan.price}{plan.period ? `/${plan.period}` : ""}</span>
-                                                </div>
-                                                {plan.credits && (
-                                                    <p className="text-sm text-muted-foreground">{plan.credits}</p>
-                                                )}
-                                                {plan.features && plan.features.length > 0 && (
-                                                    <ul className="text-xs text-muted-foreground mt-2 space-y-1">
-                                                        {plan.features.slice(0, 4).map((f: string, j: number) => (
-                                                            <li key={j}>• {f}</li>
-                                                        ))}
-                                                    </ul>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {analysisResult.pricing.promotions && analysisResult.pricing.promotions.length > 0 && (
-                                        <div className="mt-3 text-sm text-amber-400">
-                                            🎁 {analysisResult.pricing.promotions.join(" • ")}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Features */}
-                            {analysisResult.features?.highlighted && analysisResult.features.highlighted.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold mb-3 text-foreground">✨ Key Features</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        {analysisResult.features.highlighted.map((f: string, i: number) => (
-                                            <span key={i} className="px-2 py-1 bg-surface-elevated text-xs rounded-full text-muted-foreground">
-                                                {f}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    {analysisResult.features.differentiators && analysisResult.features.differentiators.length > 0 && (
-                                        <div className="mt-3">
-                                            <p className="text-xs text-muted-foreground mb-1">Differentiators:</p>
-                                            <ul className="text-sm text-foreground space-y-1">
-                                                {analysisResult.features.differentiators.map((d: string, i: number) => (
-                                                    <li key={i}>→ {d}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Target Audience */}
-                            {analysisResult.positioning?.targetAudience && (
-                                <div>
-                                    <h3 className="font-semibold mb-2 text-foreground">🎯 Target Audience</h3>
-                                    <p className="text-sm text-muted-foreground">{analysisResult.positioning.targetAudience}</p>
-                                    {analysisResult.positioning.valueProposition && (
-                                        <p className="text-sm text-emerald-400 mt-2">"{analysisResult.positioning.valueProposition}"</p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Social Proof */}
-                            {analysisResult.positioning?.socialProof && analysisResult.positioning.socialProof.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold mb-2 text-foreground">🏆 Social Proof</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        {analysisResult.positioning.socialProof.map((s: string, i: number) => (
-                                            <span key={i} className="px-2 py-1 bg-amber-500/10 text-xs rounded-full text-amber-400">
-                                                {s}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Key Insights */}
-                            {analysisResult.insights && analysisResult.insights.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold mb-3 text-foreground">💡 Key Insights</h3>
-                                    <ul className="space-y-2">
-                                        {analysisResult.insights.map((insight: string, i: number) => (
-                                            <li key={i} className="flex gap-2 text-sm text-muted-foreground">
-                                                <span className="text-emerald-400 shrink-0">→</span>
-                                                {insight}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
+            {/* Delete Competitor Dialog */}
+            <DeleteCompetitorDialog
+                competitor={deletingCompetitor}
+                onClose={() => setDeletingCompetitor(null)}
+                onDeleted={handleDeleteComplete}
+            />
 
             <main className="flex-1 pt-24 pb-12 px-6">
                 <div className="max-w-6xl mx-auto">
@@ -548,19 +417,26 @@ export default function Dashboard() {
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-3">
                                 <h1 className="font-display text-4xl text-foreground">Dashboard</h1>
-                                <Badge variant={userPlan === "free" ? "outline" : "default"} className={cn(
-                                    "uppercase tracking-wider text-[11px] px-2",
-                                    userPlan === "pro" && "bg-emerald-500 text-black hover:bg-emerald-600 font-bold",
-                                    userPlan === "enterprise" && "bg-purple-500 text-white hover:bg-purple-600 font-bold"
-                                )}>
+                                <Badge
+                                    variant={userPlan === "free" ? "outline" : "default"}
+                                    className={cn(
+                                        "uppercase tracking-wider text-[11px] px-2",
+                                        userPlan === "pro" &&
+                                        "bg-emerald-500 text-black hover:bg-emerald-600 font-bold",
+                                        userPlan === "enterprise" &&
+                                        "bg-purple-500 text-white hover:bg-purple-600 font-bold"
+                                    )}
+                                >
                                     {userPlan}
                                 </Badge>
                                 <span className="text-[11px] text-muted-foreground font-mono bg-muted/30 px-2 py-1 rounded-sm border border-border/50">
-                                    {competitors.length} / {userPlan === "free" ? 1 : userPlan === "pro" ? 5 : "10"} SLOTS
+                                    {competitors.length} /{" "}
+                                    {userPlan === "free" ? 1 : userPlan === "pro" ? 5 : "10"} SLOTS
                                 </span>
                             </div>
                             <p className="text-sm text-muted-foreground italic max-w-md">
-                                Market intelligence grid active. Monitoring {competitors.length} competitors for strategic shifts.
+                                Market intelligence grid active. Monitoring {competitors.length}{" "}
+                                competitors for strategic shifts.
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -583,9 +459,12 @@ export default function Dashboard() {
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-md">
                                     <DialogHeader>
-                                        <DialogTitle className="font-display text-xl">Add a Competitor</DialogTitle>
+                                        <DialogTitle className="font-display text-xl">
+                                            Add a Competitor
+                                        </DialogTitle>
                                         <DialogDescription>
-                                            Enter their pricing or homepage URL. We&apos;ll take a snapshot immediately.
+                                            Enter their pricing or homepage URL. We&apos;ll take a snapshot
+                                            immediately.
                                         </DialogDescription>
                                     </DialogHeader>
                                     <form onSubmit={handleAddCompetitor} className="space-y-4 mt-4">
@@ -628,7 +507,9 @@ export default function Dashboard() {
                                             <Button
                                                 type="submit"
                                                 className="flex-1"
-                                                disabled={isSubmitting || !competitorName || !competitorUrl}
+                                                disabled={
+                                                    isSubmitting || !competitorName || !competitorUrl
+                                                }
                                             >
                                                 {isSubmitting ? (
                                                     <>
@@ -652,15 +533,25 @@ export default function Dashboard() {
                             <CardHeader className="pb-2">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <CardTitle className="text-xl font-display">Market Positioning Radar</CardTitle>
-                                        <CardDescription>Competitive quadrant mapping: Feature Density vs. Starting Price</CardDescription>
+                                        <CardTitle className="text-xl font-display">
+                                            Market Positioning Radar
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Competitive quadrant mapping: Feature Density vs. Starting
+                                            Price
+                                        </CardDescription>
                                     </div>
-                                    <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">PRO ANALYSIS</Badge>
+                                    <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+                                        PRO ANALYSIS
+                                    </Badge>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                                    <MarketRadar entities={radarData} className="aspect-square max-w-[400px] mx-auto" />
+                                    <MarketRadar
+                                        entities={radarData}
+                                        className="aspect-square max-w-[400px] mx-auto"
+                                    />
                                     <div className="space-y-4">
                                         <div className="p-5 bg-white/[0.03] rounded-xl border border-white/5 backdrop-blur-sm shadow-inner">
                                             <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-400 mb-3 flex items-center gap-2">
@@ -668,23 +559,35 @@ export default function Dashboard() {
                                                 Strategic Insight
                                             </h4>
                                             <p className="text-[13px] leading-relaxed text-slate-200 font-medium">
-                                                {radarData.length > 2 ? (
-                                                    "Competitive clustering detected in mid-market. Clear disruptor white-space exists in high-feature, low-price quadrant."
-                                                ) : (
-                                                    "Aggregating data points. Add 2 more competitors to activate high-fidelity quadrant analysis."
-                                                )}
+                                                {radarData.length > 2
+                                                    ? "Competitive clustering detected in mid-market. Clear disruptor white-space exists in high-feature, low-price quadrant."
+                                                    : "Aggregating data points. Add 2 more competitors to activate high-fidelity quadrant analysis."}
                                             </p>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="text-center p-4 border border-white/5 rounded-xl bg-white/[0.01] hover:bg-white/[0.03] transition-colors group">
-                                                <div className="text-3xl font-display text-white group-hover:text-emerald-400 transition-colors">{radarData.length}</div>
-                                                <div className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mt-1">Nodes Mapped</div>
+                                                <div className="text-3xl font-display text-white group-hover:text-emerald-400 transition-colors">
+                                                    {radarData.length}
+                                                </div>
+                                                <div className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mt-1">
+                                                    Nodes Mapped
+                                                </div>
                                             </div>
                                             <div className="text-center p-4 border border-white/5 rounded-xl bg-white/[0.01] hover:bg-white/[0.03] transition-colors group">
                                                 <div className="text-3xl font-display text-white group-hover:text-emerald-400 transition-colors">
-                                                    {radarData.length > 0 ? (radarData.reduce((acc, curr) => acc + curr.featureDensity, 0) / radarData.length).toFixed(1) : "0"}
+                                                    {radarData.length > 0
+                                                        ? (
+                                                            radarData.reduce(
+                                                                (acc, curr) =>
+                                                                    acc + curr.featureDensity,
+                                                                0
+                                                            ) / radarData.length
+                                                        ).toFixed(1)
+                                                        : "0"}
                                                 </div>
-                                                <div className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mt-1">Avg Efficiency</div>
+                                                <div className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mt-1">
+                                                    Avg Efficiency
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -704,18 +607,35 @@ export default function Dashboard() {
                                 {competitors.length === 0 ? (
                                     <Card className="glass-card shadow-none border-dashed bg-transparent">
                                         <CardContent className="py-12 text-center relative overflow-hidden">
-                                            {/* Architectural Background Pattern */}
                                             <div className="absolute inset-0 pointer-events-none opacity-10">
-                                                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                                                <svg
+                                                    width="100%"
+                                                    height="100%"
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                >
                                                     <defs>
-                                                        <pattern id="dotGridLarge" width="20" height="20" patternUnits="userSpaceOnUse">
-                                                            <circle cx="2" cy="2" r="1.5" fill="currentColor" className="text-muted-foreground" />
+                                                        <pattern
+                                                            id="dotGridLarge"
+                                                            width="20"
+                                                            height="20"
+                                                            patternUnits="userSpaceOnUse"
+                                                        >
+                                                            <circle
+                                                                cx="2"
+                                                                cy="2"
+                                                                r="1.5"
+                                                                fill="currentColor"
+                                                                className="text-muted-foreground"
+                                                            />
                                                         </pattern>
                                                     </defs>
-                                                    <rect width="100%" height="100%" fill="url(#dotGridLarge)" />
+                                                    <rect
+                                                        width="100%"
+                                                        height="100%"
+                                                        fill="url(#dotGridLarge)"
+                                                    />
                                                 </svg>
                                             </div>
-
                                             <div className="relative z-20 flex flex-col items-center justify-center py-20 text-center">
                                                 <div className="relative mb-8">
                                                     <div className="absolute inset-0 bg-emerald-500/20 blur-3xl rounded-full" />
@@ -723,12 +643,13 @@ export default function Dashboard() {
                                                         <Plus className="w-10 h-10 text-emerald-400/50" />
                                                     </div>
                                                 </div>
-
-                                                <h3 className="font-display text-3xl text-white mb-3">Build Your Intelligence Grid</h3>
+                                                <h3 className="font-display text-3xl text-white mb-3">
+                                                    Build Your Intelligence Grid
+                                                </h3>
                                                 <p className="text-sm text-muted-foreground max-w-[280px] mb-10 leading-relaxed font-medium">
-                                                    Initialize market monitoring by adding your first competitor to the observation matrix.
+                                                    Initialize market monitoring by adding your first
+                                                    competitor to the observation matrix.
                                                 </p>
-
                                                 <Button
                                                     variant="glow-emerald"
                                                     className="h-11 px-8 rounded-xl"
@@ -742,97 +663,18 @@ export default function Dashboard() {
                                     </Card>
                                 ) : (
                                     competitors.map((competitor) => (
-                                        <Card
+                                        <CompetitorCard
                                             key={competitor.id}
-                                            className="glass-card hover:border-emerald-500/30 transition-colors cursor-pointer"
-                                        >
-                                            <CardHeader className="pb-2">
-                                                <div className="flex items-start justify-between">
-                                                    <CardTitle
-                                                        className="text-base font-medium cursor-pointer hover:text-emerald-400 transition-colors"
-                                                        onClick={() => router.push(`/dashboard/competitors/${competitor.id}`)}
-                                                    >
-                                                        {competitor.name}
-                                                    </CardTitle>
-                                                    <div className="flex items-center gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="w-7 h-7 text-muted-foreground hover:text-emerald-400"
-                                                            onClick={() => handleViewHistory(competitor)}
-                                                            title="View History"
-                                                            aria-label={`View pricing history for ${competitor.name}`}
-                                                        >
-                                                            <LineChart className="w-4 h-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="w-7 h-7 text-muted-foreground hover:text-blue-400"
-                                                            onClick={() => openEditDialog(competitor)}
-                                                            title="Edit Competitor"
-                                                            aria-label={`Edit ${competitor.name}`}
-                                                        >
-                                                            <Pencil className="w-3.5 h-3.5" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="w-7 h-7 text-muted-foreground hover:text-foreground"
-                                                            onClick={() => window.open(competitor.url, "_blank")}
-                                                            title="Direct Link"
-                                                            aria-label={`Open ${competitor.name} website in new tab`}
-                                                        >
-                                                            <ExternalLink className="w-4 h-4" />
-                                                        </Button>
-                                                        <Badge
-                                                            variant={competitor.status === "active" ? "default" : "secondary"}
-                                                            className="text-[10px] h-5"
-                                                        >
-                                                            {competitor.status}
-                                                        </Badge>
-                                                    </div>
-                                                </div>
-                                                <CardDescription className="text-xs truncate">
-                                                    {competitor.url}
-                                                </CardDescription>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                                    <span className="flex items-center gap-1">
-                                                        <Clock className="w-3 h-3" />
-                                                        {formatRelativeTime(competitor.last_checked_at)}
-                                                    </span>
-                                                    {competitor.failure_count > 0 && (
-                                                        <span className="flex items-center gap-1 text-amber-500">
-                                                            <AlertCircle className="w-3 h-3" />
-                                                            {competitor.failure_count} failures
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="mt-5">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="w-full text-xs h-9 bg-emerald-500/[0.05] border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-black hover:border-emerald-500 transition-all duration-300 font-medium"
-                                                        onClick={() => handleAnalyze(competitor.id)}
-                                                        disabled={analyzingId === competitor.id}
-                                                    >
-                                                        {analyzingId === competitor.id ? (
-                                                            <>
-                                                                <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
-                                                                Scanning...
-                                                            </>
-                                                        ) : (
-                                                            <span className="flex items-center gap-1.5">
-                                                                <RefreshCw className="w-3.5 h-3.5" />
-                                                                Scan Now
-                                                            </span>
-                                                        )}
-                                                    </Button>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
+                                            competitor={competitor}
+                                            analyzingId={analyzingId}
+                                            onAnalyze={handleAnalyze}
+                                            onViewHistory={handleViewHistory}
+                                            onEdit={openEditDialog}
+                                            onDelete={setDeletingCompetitor}
+                                            onNavigate={(id) =>
+                                                router.push(`/dashboard/competitors/${id}`)
+                                            }
+                                        />
                                     ))
                                 )}
                             </div>
@@ -842,7 +684,6 @@ export default function Dashboard() {
                         <div className="lg:col-span-2">
                             <DashboardAlertSummary
                                 alerts={alerts.map((alert) => {
-                                    // Parse ai_insight to get title if needed
                                     let parsedTitle = alert.title || alert.diff_summary;
                                     try {
                                         if (alert.ai_insight) {
@@ -856,8 +697,14 @@ export default function Dashboard() {
                                     return {
                                         id: alert.id,
                                         competitor_name: alert.competitors?.name,
-                                        type: (alert.type || (alert.is_meaningful ? "price_increase" : "cta_changed")) as PricingDiffType,
-                                        severity: (alert.severity || (alert.is_meaningful ? "medium" : "low")) as AlertSeverity,
+                                        type: (alert.type ||
+                                            (alert.is_meaningful
+                                                ? "price_increase"
+                                                : "cta_changed")) as PricingDiffType,
+                                        severity: (alert.severity ||
+                                            (alert.is_meaningful
+                                                ? "medium"
+                                                : "low")) as AlertSeverity,
                                         title: parsedTitle,
                                         is_read: alert.is_read,
                                         created_at: alert.created_at,
@@ -872,13 +719,20 @@ export default function Dashboard() {
             </main>
 
             {/* Pricing History Dialog */}
-            <Dialog open={!!selectedHistoryComp} onOpenChange={(open) => !open && setSelectedHistoryComp(null)}>
+            <Dialog
+                open={!!selectedHistoryComp}
+                onOpenChange={(open) => !open && setSelectedHistoryComp(null)}
+            >
                 <DialogContent className="max-w-3xl glass-card">
                     <DialogHeader>
                         <div className="flex items-center gap-2 mb-2">
-                            <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">AGENTIC INTELLIGENCE</Badge>
+                            <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+                                AGENTIC INTELLIGENCE
+                            </Badge>
                         </div>
-                        <DialogTitle className="text-2xl font-display">{selectedHistoryComp?.name} Pricing Trajectory</DialogTitle>
+                        <DialogTitle className="text-2xl font-display">
+                            {selectedHistoryComp?.name} Pricing Trajectory
+                        </DialogTitle>
                         <DialogDescription>
                             Historical Price Movements for {selectedHistoryComp?.url}
                         </DialogDescription>
@@ -896,28 +750,46 @@ export default function Dashboard() {
                                 <History className="w-12 h-12 text-muted-foreground/30 mb-4" />
                                 <h4 className="font-medium text-foreground">Awaiting More Data</h4>
                                 <p className="text-sm text-muted-foreground max-w-xs mt-2">
-                                    Chronological pricing trends populate as RivalEye completes more daily checks for this competitor.
+                                    Chronological pricing trends populate as RivalEye completes more
+                                    daily checks for this competitor.
                                 </p>
                             </div>
                         )}
                     </div>
 
                     <div className="flex justify-end pt-4">
-                        <Button variant="outline" onClick={() => setSelectedHistoryComp(null)}>Close Analysis</Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => setSelectedHistoryComp(null)}
+                        >
+                            Close Analysis
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>
 
             {/* Edit Competitor Dialog */}
-            <Dialog open={!!editingCompetitor} onOpenChange={(open) => !open && setEditingCompetitor(null)}>
+            <Dialog
+                open={!!editingCompetitor}
+                onOpenChange={(open) => !open && setEditingCompetitor(null)}
+            >
                 <DialogContent className="sm:max-w-md glass-card">
                     <DialogHeader>
-                        <DialogTitle className="font-display text-xl">Edit Competitor</DialogTitle>
+                        <DialogTitle className="font-display text-xl">
+                            Edit Competitor
+                        </DialogTitle>
                         <DialogDescription>
-                            Update competitor details. Changing the URL will reset all historical data.
+                            Update competitor details. Changing the URL will reset all historical
+                            data.
                         </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={(e) => { e.preventDefault(); handleEditCompetitor(); }} className="space-y-4 mt-4">
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            handleEditCompetitor();
+                        }}
+                        className="space-y-4 mt-4"
+                    >
                         <div className="space-y-2">
                             <Label htmlFor="edit-name">Competitor Name</Label>
                             <Input
@@ -940,15 +812,17 @@ export default function Dashboard() {
                             />
                         </div>
 
-                        {/* URL Change Warning */}
                         {urlIsChanging && (
                             <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
                                 <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="text-sm font-medium text-amber-500">Historical data will be reset</p>
+                                    <p className="text-sm font-medium text-amber-500">
+                                        Historical data will be reset
+                                    </p>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        Changing the URL will delete all snapshots and alerts for this competitor.
-                                        This ensures data integrity for the new target.
+                                        Changing the URL will delete all snapshots and alerts for
+                                        this competitor. This ensures data integrity for the new
+                                        target.
                                     </p>
                                 </div>
                             </div>
