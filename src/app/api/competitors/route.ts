@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { getUserId } from "@/lib/auth";
 import { analyzeCompetitorTask } from "@/trigger/analyzeCompetitor";
-import { checkRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
+import { checkRateLimit, RATE_LIMITS, rateLimitHeaders } from "@/lib/rateLimit";
 import { validateCompetitorUrl } from "@/lib/urlValidator";
 
 /**
@@ -98,7 +98,13 @@ export async function POST(request: NextRequest) {
         if (!rateCheck.allowed) {
             return NextResponse.json(
                 { error: "Too many requests. Please slow down." },
-                { status: 429, headers: { "Retry-After": String(Math.ceil(rateCheck.resetMs / 1000)) } }
+                {
+                    status: 429,
+                    headers: {
+                        "Retry-After": String(Math.ceil(rateCheck.resetMs / 1000)),
+                        ...rateLimitHeaders(rateCheck, RATE_LIMITS.competitors),
+                    },
+                }
             );
         }
 

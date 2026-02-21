@@ -110,3 +110,18 @@ export const RATE_LIMITS = {
     /** Auth endpoints: 10 per minute per IP */
     auth: { maxRequests: 10, windowMs: 60 * 1000 } as RateLimitConfig,
 } as const;
+
+/**
+ * Generate standard rate limit response headers from a result.
+ * Spread into NextResponse headers: `{ headers: rateLimitHeaders(result, config) }`
+ */
+export function rateLimitHeaders(
+    result: RateLimitResult,
+    config: RateLimitConfig
+): Record<string, string> {
+    return {
+        "X-RateLimit-Limit": String(config.maxRequests),
+        "X-RateLimit-Remaining": String(result.remaining),
+        "X-RateLimit-Reset": String(Math.ceil(result.resetMs / 1000)),
+    };
+}

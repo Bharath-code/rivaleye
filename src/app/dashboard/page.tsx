@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import {
     DeleteCompetitorDialog,
     DashboardSkeleton,
 } from "@/components/dashboard";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -161,6 +162,13 @@ export default function Dashboard() {
             analytics.dashboardVisit(0);
         }
     }, [fetchData]);
+
+    // Keyboard shortcuts: N = add competitor, R = refresh
+    const shortcuts = useMemo(() => ({
+        n: () => setIsAddingCompetitor(true),
+        r: () => fetchData(),
+    }), [fetchData]);
+    useKeyboardShortcuts(shortcuts);
 
     // ══════════════════════════════════════════════════════════════════════════
     // HANDLERS
@@ -740,8 +748,21 @@ export default function Dashboard() {
 
                     <div className="py-6">
                         {isHistoryLoading ? (
-                            <div className="h-[300px] flex items-center justify-center">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
+                            <div className="h-[300px] space-y-4 p-4">
+                                {/* Chart skeleton */}
+                                <div className="flex items-end gap-2 h-[250px]">
+                                    {[40, 65, 50, 80, 60, 75, 45, 70, 55, 85, 60, 72].map((h, i) => (
+                                        <div
+                                            key={i}
+                                            className="flex-1 bg-muted/40 rounded-t-md animate-pulse"
+                                            style={{ height: `${h}%` }}
+                                        />
+                                    ))}
+                                </div>
+                                <div className="flex justify-between">
+                                    <div className="h-3 w-16 bg-muted/40 rounded animate-pulse" />
+                                    <div className="h-3 w-16 bg-muted/40 rounded animate-pulse" />
+                                </div>
                             </div>
                         ) : historyChartData.length > 0 ? (
                             <PricingTrendChart data={historyChartData} className="w-full" />

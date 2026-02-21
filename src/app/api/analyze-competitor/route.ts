@@ -5,7 +5,7 @@ import { captureAndAnalyze, type CompetitorAnalysis } from "@/lib/ai/visionAnaly
 import { createHash } from "crypto";
 import { getUserWithQuota, canManualCheck, incrementManualCheckCount } from "@/lib/quotas";
 import { detectManualSpam } from "@/lib/abuseDetection";
-import { checkRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
+import { checkRateLimit, RATE_LIMITS, rateLimitHeaders } from "@/lib/rateLimit";
 
 /**
  * Create a hash of the key analysis fields for change detection
@@ -46,7 +46,13 @@ export async function POST(request: Request) {
         if (!rateCheck.allowed) {
             return NextResponse.json(
                 { error: "Too many analysis requests. Please wait a few minutes." },
-                { status: 429, headers: { "Retry-After": String(Math.ceil(rateCheck.resetMs / 1000)) } }
+                {
+                    status: 429,
+                    headers: {
+                        "Retry-After": String(Math.ceil(rateCheck.resetMs / 1000)),
+                        ...rateLimitHeaders(rateCheck, RATE_LIMITS.analysis),
+                    },
+                }
             );
         }
 
