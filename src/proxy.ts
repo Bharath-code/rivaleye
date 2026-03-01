@@ -11,6 +11,7 @@ const PUBLIC_ROUTES = new Set([
     "/",
     "/login",
     "/auth",
+    "/auth/callback",
 ]);
 
 const PUBLIC_API_ROUTES = new Set([
