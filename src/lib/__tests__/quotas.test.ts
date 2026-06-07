@@ -136,10 +136,8 @@ describe('quotas', () => {
     });
 
     describe('incrementManualCheckCount', () => {
-        it('updates user record', async () => {
-            const mockUpdate = vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({ error: null })
-            });
+        it('calls rpc to increment', async () => {
+            const mockRpc = vi.fn().mockResolvedValue({ error: null });
             const mockSupabase = {
                 from: vi.fn().mockReturnValue({
                     select: vi.fn().mockReturnValue({
@@ -150,13 +148,15 @@ describe('quotas', () => {
                             })
                         })
                     }),
-                    update: mockUpdate
+                    update: vi.fn().mockReturnValue({
+                        eq: vi.fn().mockResolvedValue({ error: null })
+                    })
                 }),
-                rpc: vi.fn()
+                rpc: mockRpc
             };
 
             await incrementManualCheckCount(mockSupabase as any, 'u1');
-            expect(mockUpdate).toHaveBeenCalled();
+            expect(mockRpc).toHaveBeenCalledWith('increment_manual_check_count', { user_id: 'u1' });
         });
     });
 

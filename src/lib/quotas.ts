@@ -39,9 +39,8 @@ export interface QuotaCheckResult {
  */
 export function canScheduledCrawl(user: User): QuotaCheckResult {
     const limits = PLAN_LIMITS[user.plan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
-    const maxCrawls = (limits as any).scheduledCrawlsPerDay || 50; // Fallback for Pro
 
-    if (user.crawls_today >= maxCrawls) {
+    if (user.crawls_today >= limits.scheduledCrawlsPerDay) {
         return {
             allowed: false,
             reason: "Daily crawl limit reached",
@@ -57,10 +56,8 @@ export function canScheduledCrawl(user: User): QuotaCheckResult {
  */
 export function canManualCheck(user: User): QuotaCheckResult {
     const limits = PLAN_LIMITS[user.plan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
-    // Note: featureFlags.ts needs manualChecksPerDay added to its interface
-    const maxManual = (limits as any).manualChecksPerDay || (user.plan === "pro" ? 5 : 1);
 
-    if (user.manual_checks_today >= maxManual) {
+    if (user.manual_checks_today >= limits.manualChecksPerDay) {
         return {
             allowed: false,
             reason: "You've reached today's manual check limit. We'll check again tomorrow.",
@@ -133,10 +130,8 @@ export async function incrementManualCheckCount(
 ): Promise<void> {
     await ensureQuotaReset(supabase, userId);
 
-    await supabase
-        .from("users")
-        .update({ manual_checks_today: supabase.rpc("increment", { x: 1 }) })
-        .eq("id", userId);
+    const { error } = await supabase.rpc("increment_manual_check_count", { user_id: userId });
+    if (error) throw error;
 }
 
 /**
