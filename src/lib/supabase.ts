@@ -4,9 +4,15 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL environment variable");
 }
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY environment variable");
+const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+
+if (!supabaseAnonKey) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable");
 }
+
+const resolvedSupabaseAnonKey: string = supabaseAnonKey;
 
 /**
  * Client-side Supabase client
@@ -18,7 +24,7 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY) {
  */
 export const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
+    resolvedSupabaseAnonKey,
     {
         auth: {
             autoRefreshToken: true,
@@ -40,7 +46,7 @@ export function createServerClient() {
         // Fallback to publishable key if service role not available
         return createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+            resolvedSupabaseAnonKey,
             {
                 auth: {
                     autoRefreshToken: false,
@@ -61,4 +67,3 @@ export function createServerClient() {
         }
     );
 }
-

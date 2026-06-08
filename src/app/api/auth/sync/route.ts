@@ -39,9 +39,17 @@ export async function POST(request: NextRequest) {
 
         // Verify tokens and get user
         const { createClient } = await import("@supabase/supabase-js");
+        const anonKey =
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+
+        if (!anonKey) {
+            return NextResponse.json({ error: "Supabase anon key is not configured" }, { status: 500 });
+        }
+
         const supabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
+            anonKey
         );
 
         const { data: { user }, error } = await supabase.auth.getUser(accessToken);

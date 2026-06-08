@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.hoisted(() => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://fake.supabase.co';
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY = 'fake-key';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'fake-key';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
 });
 

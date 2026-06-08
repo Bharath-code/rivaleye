@@ -43,8 +43,9 @@ next-env.d.ts
 
 
 .agent/
-supabase
+supabase/.temp/
+
 debug/
-migrations
+
 manual
 docs/
