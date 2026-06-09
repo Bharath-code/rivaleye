@@ -1,0 +1,374 @@
+{
+  "competitors": [
+    {
+      "slug": "klue",
+      "name": "Klue",
+      "tagline": "Competitive enablement platform for enterprises",
+      "url": "https://klue.com",
+      "founded": 2015,
+      "headquarters": "Vancouver, Canada",
+      "pricing": {
+        "starting": "Custom enterprise pricing",
+        "model": "Annual contract, sales-led",
+        "tier": "Enterprise",
+        "freeTier": false
+      },
+      "bestFor": "Large enterprises (1000+ employees) with dedicated competitive intel teams and 6-figure annual budgets",
+      "strengths": [
+        "Mature battlecard workflow with sales-team distribution",
+        "Deep integrations with Salesforce, Slack, Highspot",
+        "Field intel collection (sales reps can submit competitor news)",
+        "Enterprise SSO, SOC 2, GDPR compliance"
+      ],
+      "weaknesses": [
+        "Quote-based pricing requires a sales call (no public pricing)",
+        "Minimum annual contract typically $30K-$100K+",
+        "Onboarding takes 4-8 weeks",
+        "Heavy feature set means most teams use less than 30% of capabilities"
+      ],
+      "keyDifferences": [
+        "Klue is built for enterprise enablement teams; RivalEye is built for indie founders and small teams",
+        "Klue requires manual intel collection; RivalEye auto-detects pricing changes daily",
+        "Klue has battlecards; RivalEye has AI-generated tactical briefs delivered to your inbox",
+        "Klue's pricing is opaque ($30K+); RivalEye starts free and is $49/mo for Pro"
+      ],
+      "verdict": {
+        "chooseCompetitor": "You have 50+ sales reps, $50K+ annual budget, and a dedicated competitive enablement team",
+        "chooseRivalEye": "You want automated, daily monitoring of competitor pricing with AI briefs, starting free"
+      }
+    },
+    {
+      "slug": "crayon",
+      "name": "Crayon",
+      "tagline": "Competitive intelligence for mid-market and enterprise",
+      "url": "https://crayon.co",
+      "founded": 2014,
+      "headquarters": "Boston, USA",
+      "pricing": {
+        "starting": "Custom (typically $20K-$80K/year)",
+        "model": "Annual contract, sales-led",
+        "tier": "Enterprise",
+        "freeTier": false
+      },
+      "bestFor": "Mid-market and enterprise companies (200-5000 employees) wanting structured battlecards and sales enablement",
+      "strengths": [
+        "AI-powered insight summarization",
+        "Strong battlecard builder with templates",
+        "Slack and Salesforce integrations",
+        "Good content curation features"
+      ],
+      "weaknesses": [
+        "Opaque pricing (sales call required)",
+        "Steep learning curve",
+        "Auto-monitoring of competitor pages is limited compared to RivalEye",
+        "No geo-aware pricing tracking"
+      ],
+      "keyDifferences": [
+        "Crayon focuses on content + battlecards; RivalEye focuses on automated pricing change detection",
+        "Crayon is sales-led ($$$); RivalEye is self-serve ($0-$49/mo)",
+        "RivalEye tracks pricing in 4 regions simultaneously; Crayon does not",
+        "Crayon requires analyst hours to interpret changes; RivalEye uses AI to interpret for you"
+      ],
+      "verdict": {
+        "chooseCompetitor": "You need battlecards for a sales team and have $20K+/year to spend",
+        "chooseRivalEye": "You want AI-monitored pricing changes with regional coverage, self-serve"
+      }
+    },
+    {
+      "slug": "visualping",
+      "name": "Visualping",
+      "tagline": "Website change detection for any use case",
+      "url": "https://visualping.com",
+      "founded": 2014,
+      "headquarters": "Toronto, Canada",
+      "pricing": {
+        "starting": "Free for 200 checks/month",
+        "model": "Tiered subscription",
+        "tier": "Self-serve",
+        "freeTier": true
+      },
+      "bestFor": "Anyone who wants to monitor any webpage for changes (jobs, news, prices, inventory)",
+      "strengths": [
+        "Extremely flexible — monitors any webpage element",
+        "Generous free tier (200 checks)",
+        "Easy to set up (point and click)",
+        "Email + Slack notifications"
+      ],
+      "weaknesses": [
+        "Generic — does not understand pricing context (no tier-raised insight)",
+        "No AI interpretation of changes — you just get a page-changed alert",
+        "Single-region checks (no geo-aware pricing)",
+        "No battlecard or tactical brief generation"
+      ],
+      "keyDifferences": [
+        "Visualping is a general-purpose page monitor; RivalEye is purpose-built for competitor pricing",
+        "Visualping tells you something changed; RivalEye tells you Stripe raised their Pro tier by 20% and what to do",
+        "RivalEye is geo-aware (tracks 4 regions); Visualping checks one URL at a time",
+        "RivalEye uses Vision AI to extract structured pricing data; Visualping detects DOM changes"
+      ],
+      "verdict": {
+        "chooseCompetitor": "You want to monitor many different types of pages (jobs, news, inventory, etc.)",
+        "chooseRivalEye": "You specifically want to track competitor pricing with AI interpretation"
+      }
+    },
+    {
+      "slug": "kompyte",
+      "name": "Kompyte",
+      "tagline": "Competitive intelligence with AI summaries",
+      "url": "https://kompyte.com",
+      "founded": 2016,
+      "headquarters": "San Diego, USA",
+      "pricing": {
+        "starting": "$899/mo",
+        "model": "Tiered subscription",
+        "tier": "Mid-market",
+        "freeTier": false
+      },
+      "bestFor": "Marketing and product teams at mid-market SaaS companies who want automated competitor tracking",
+      "strengths": [
+        "Automated competitor tracking with AI summaries",
+        "Battlecard creation",
+        "Win/loss analysis integration",
+        "Daily Slack digests"
+      ],
+      "weaknesses": [
+        "Starting price is $899/mo — out of reach for indie founders",
+        "Better suited for product marketers than for founders",
+        "Single-region tracking (no geo-aware pricing)",
+        "Limited free trial (no permanent free plan)"
+      ],
+      "keyDifferences": [
+        "Kompyte is $899/mo; RivalEye is free to start and $49/mo for Pro",
+        "RivalEye tracks pricing in 4 regions; Kompyte is single-region",
+        "RivalEye's AI briefs are more granular (plan-by-plan price changes); Kompyte's are higher-level",
+        "RivalEye has a permanent free tier; Kompyte's trial is 14 days"
+      ],
+      "verdict": {
+        "chooseCompetitor": "You have $11K/year and want battlecards plus win/loss analysis",
+        "chooseRivalEye": "You want automated pricing tracking on a budget, with regional coverage"
+      }
+    },
+    {
+      "slug": "prisync",
+      "name": "Prisync",
+      "tagline": "Price monitoring and competitive pricing for e-commerce",
+      "url": "https://prisync.com",
+      "founded": 2013,
+      "headquarters": "Istanbul, Turkey",
+      "pricing": {
+        "starting": "$99/mo",
+        "model": "Tiered subscription",
+        "tier": "SMB",
+        "freeTier": false
+      },
+      "bestFor": "E-commerce retailers tracking competitor product prices (Shopify, Amazon, etc.)",
+      "strengths": [
+        "Massive product database for e-commerce",
+        "Stock availability tracking",
+        "MAP (minimum advertised price) monitoring",
+        "Good Shopify and WooCommerce integrations"
+      ],
+      "weaknesses": [
+        "Built for e-commerce product SKUs, not SaaS pricing pages",
+        "Single-region tracking",
+        "No AI interpretation of pricing changes",
+        "Limited to product-level monitoring (not page-level)"
+      ],
+      "keyDifferences": [
+        "Prisync monitors product SKUs; RivalEye monitors SaaS pricing pages and positioning",
+        "RivalEye is geo-aware; Prisync is single-region",
+        "RivalEye uses Vision AI to extract pricing; Prisync scrapes structured data only",
+        "RivalEye generates tactical briefs; Prisync shows data tables"
+      ],
+      "verdict": {
+        "chooseCompetitor": "You are an e-commerce retailer tracking 1,000+ product SKUs",
+        "chooseRivalEye": "You are a SaaS company tracking competitor pricing pages and positioning"
+      }
+    },
+    {
+      "slug": "competitorinsight",
+      "name": "Competitor Insight",
+      "tagline": "Lightweight competitor tracking inside G2",
+      "url": "https://g2.com",
+      "founded": 2012,
+      "headquarters": "Chicago, USA",
+      "pricing": {
+        "starting": "Free tier available, paid plans from $99/mo",
+        "model": "Per-user subscription",
+        "tier": "Self-serve to mid-market",
+        "freeTier": true
+      },
+      "bestFor": "Product marketers already using G2 who want basic competitive intel alongside review data",
+      "strengths": [
+        "Bundled with G2 (no extra vendor if you are a G2 customer)",
+        "Review-driven insights",
+        "Good market positioning data",
+        "Self-serve setup"
+      ],
+      "weaknesses": [
+        "Limited automated monitoring (mostly manual)",
+        "Not a dedicated CI tool — a feature inside G2",
+        "No geo-aware pricing tracking",
+        "Lighter on AI insights than RivalEye"
+      ],
+      "keyDifferences": [
+        "G2 Competitor Insight is bundled with reviews; RivalEye is a dedicated CI product",
+        "RivalEye is automated (daily Vision AI scans); G2 CI is mostly manual curation",
+        "RivalEye tracks 4 regions; G2 CI is single-market",
+        "RivalEye is independent (works for any tool); G2 CI is locked to G2's review ecosystem"
+      ],
+      "verdict": {
+        "chooseCompetitor": "You are already paying for G2 and want review + competitive intel in one place",
+        "chooseRivalEye": "You want dedicated, automated pricing change detection with AI briefs"
+      }
+    },
+    {
+      "slug": "datanyze",
+      "name": "Datanyze",
+      "tagline": "Tech profile detection and lead enrichment",
+      "url": "https://datanyze.com",
+      "founded": 2013,
+      "headquarters": "San Francisco, USA",
+      "pricing": {
+        "starting": "$89/mo per user",
+        "model": "Per-seat subscription",
+        "tier": "SMB",
+        "freeTier": false
+      },
+      "bestFor": "Sales teams using technographic data to prospect (not a pure CI tool)",
+      "strengths": [
+        "Technographic data (which tools prospects use)",
+        "Lead generation features",
+        "Browser extension for on-the-go lookups",
+        "CRM integrations"
+      ],
+      "weaknesses": [
+        "Not a CI tool — it's a sales intelligence tool with some overlap",
+        "No automated pricing change alerts",
+        "No AI interpretation",
+        "Per-seat pricing gets expensive for teams"
+      ],
+      "keyDifferences": [
+        "Datanyze is a sales intelligence tool; RivalEye is a competitive intelligence tool",
+        "RivalEye is automated; Datanyze is manual lookup",
+        "RivalEye generates AI briefs; Datanyze shows static tech profiles",
+        "Different audiences: Datanyze for sales; RivalEye for founders + marketers"
+      ],
+      "verdict": {
+        "chooseCompetitor": "You need technographic data for sales prospecting",
+        "chooseRivalEye": "You want automated competitor pricing monitoring for your marketing/product team"
+      }
+    },
+    {
+      "slug": "spyglown",
+      "name": "Spyglown",
+      "tagline": "AI-powered competitive monitoring for marketing teams",
+      "url": "https://spyglown.com",
+      "founded": 2022,
+      "headquarters": "Remote",
+      "pricing": {
+        "starting": "$49/mo",
+        "model": "Tiered subscription",
+        "tier": "SMB",
+        "freeTier": false
+      },
+      "bestFor": "Small marketing teams wanting AI-summarized competitor news",
+      "strengths": [
+        "AI news summarization",
+        "Slack-first design",
+        "Affordable pricing",
+        "Good for non-technical users"
+      ],
+      "weaknesses": [
+        "Newer product with less battle-testing",
+        "Focused on news/PR coverage, not pricing page monitoring",
+        "Single-region",
+        "Smaller integration ecosystem"
+      ],
+      "keyDifferences": [
+        "Spyglown tracks news mentions; RivalEye tracks pricing page changes",
+        "RivalEye uses Vision AI to extract structured pricing; Spyglown summarizes articles",
+        "RivalEye is geo-aware; Spyglown is single-market",
+        "RivalEye has a free tier; Spyglown's cheapest plan is $49/mo"
+      ],
+      "verdict": {
+        "chooseCompetitor": "You primarily care about news/PR coverage, not pricing pages",
+        "chooseRivalEye": "You want pricing change detection with AI tactical briefs"
+      }
+    },
+    {
+      "slug": "diffbot",
+      "name": "Diffbot",
+      "tagline": "Web data extraction and knowledge graph",
+      "url": "https://diffbot.com",
+      "founded": 2008,
+      "headquarters": "San Mateo, USA",
+      "pricing": {
+        "starting": "$299/mo",
+        "model": "API pricing, usage-based",
+        "tier": "Developer / Enterprise",
+        "freeTier": false
+      },
+      "bestFor": "Developers building custom data extraction pipelines (not a turnkey CI tool)",
+      "strengths": [
+        "Extremely powerful structured data extraction",
+        "Knowledge graph of 10B+ entities",
+        "API-first (programmatic access)",
+        "Custom crawlers for any page"
+      ],
+      "weaknesses": [
+        "Developer-focused — not a turnkey product for non-technical users",
+        "Expensive for what you get (no UI, no alerts out of the box)",
+        "Steep learning curve",
+        "You still have to build the alerts + briefings layer yourself"
+      ],
+      "keyDifferences": [
+        "Diffbot is raw infrastructure; RivalEye is a finished product",
+        "RivalEye is no-code (add a URL, get a daily email); Diffbot requires API integration",
+        "RivalEye is $0-$49/mo; Diffbot is $299+/mo",
+        "RivalEye includes AI briefs; Diffbot returns raw JSON"
+      ],
+      "verdict": {
+        "chooseCompetitor": "You are a developer who wants to build your own CI pipeline from scratch",
+        "chooseRivalEye": "You want a turnkey product that works in 30 seconds, no code required"
+      }
+    },
+    {
+      "slug": "watchful",
+      "name": "Watchful",
+      "tagline": "AI-powered price monitoring for e-commerce",
+      "url": "https://watchful.ai",
+      "founded": 2017,
+      "headquarters": "Austin, USA",
+      "pricing": {
+        "starting": "$249/mo",
+        "model": "Tiered subscription",
+        "tier": "SMB",
+        "freeTier": false
+      },
+      "bestFor": "E-commerce brands monitoring competitor product prices (Shopify, BigCommerce)",
+      "strengths": [
+        "AI-driven price recommendations",
+        "Shopify integration",
+        "Automated repricing suggestions",
+        "Good for e-commerce specifically"
+      ],
+      "weaknesses": [
+        "E-commerce focused — limited SaaS pricing page monitoring",
+        "No geo-aware pricing across regions",
+        "No AI tactical briefs (just price data)",
+        "Higher price point than indie founders can justify"
+      ],
+      "keyDifferences": [
+        "Watchful is for e-commerce; RivalEye is for SaaS",
+        "RivalEye monitors pricing pages + positioning + features; Watchful monitors product SKUs",
+        "RivalEye is geo-aware; Watchful is single-market",
+        "RivalEye has a free tier; Watchful's cheapest plan is $249/mo"
+      ],
+      "verdict": {
+        "chooseCompetitor": "You are an e-commerce brand repricing thousands of SKUs",
+        "chooseRivalEye": "You are a SaaS company tracking competitor pricing pages"
+      }
+    }
+  ]
+}

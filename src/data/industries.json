@@ -1,0 +1,141 @@
+{
+  "industries": [
+    {
+      "slug": "saas",
+      "name": "SaaS",
+      "headline": "Competitive intelligence for SaaS founders",
+      "painPoint": "SaaS pricing changes 3-4 times per year on average. By the time you notice, your competitor has already captured the leads you would have closed.",
+      "workflow": "Add 5-10 direct competitors. RivalEye checks their pricing pages daily across 4 regions. When a change fires, you get an AI-generated brief explaining what changed and what to consider doing — before your morning standup.",
+      "topCompetitors": ["stripe", "notion", "linear", "figma", "vercel", "slack", "intercom", "zendesk"],
+      "exampleQueries": [
+        "Which competitors raised their Pro tier this quarter?",
+        "Who added an AI feature to their pricing page?",
+        "Are any competitors switching from per-seat to usage-based pricing?",
+        "Who removed their free tier in the last 6 months?"
+      ],
+      "tactics": [
+        "Track 5 direct competitors + 3 aspirational (where you want to be in 12 months) + 2 from the tier below (who might move up)",
+        "Check pricing in your top 3 markets (US, EU, India is common for SaaS)",
+        "Watch for new feature additions, not just price changes — a new AI tier is more disruptive than a $5 price hike",
+        "Set a Slack channel for alerts so your whole team sees competitive moves in real time"
+      ]
+    },
+    {
+      "slug": "ecommerce",
+      "name": "E-commerce",
+      "headline": "Track competitor pricing across marketplaces and DTC sites",
+      "painPoint": "E-commerce pricing changes daily. A competitor's flash sale can wipe out your weekend revenue if you don't react fast enough.",
+      "workflow": "Monitor competitor product pages, brand sites, and marketplace listings. RivalEye flags price changes and uses Vision AI to extract structured pricing data — even from sites without clean markup.",
+      "topCompetitors": ["amazon", "shopify-dtc", "asos", "nike", "sephora", "best-buy", "target", "walmart"],
+      "exampleQueries": [
+        "Which competitors are running promotions this week?",
+        "Who raised MSRP in the last month?",
+        "Which DTC brands are bundling free shipping?",
+        "What price points are competitors testing for the new collection?"
+      ],
+      "tactics": [
+        "Track both DTC and marketplace prices separately — they have different dynamics",
+        "Watch for changes in shipping cost, not just product price",
+        "Geo-aware tracking matters: a competitor in India has different pricing than in the US",
+        "Set alerts for price drops greater than 15% — that is flash-sale territory"
+      ]
+    },
+    {
+      "slug": "agencies",
+      "name": "Agencies",
+      "headline": "Run competitive intel for your clients without hiring an analyst",
+      "painPoint": "Clients expect you to know their market cold. Spending 5 hours/week manually checking competitor sites is unsustainable when you are billing $150/hr.",
+      "workflow": "Set up one RivalEye workspace per client. RivalEye auto-generates weekly briefs you can include in client reports. White-label the charts for client-facing decks.",
+      "topCompetitors": ["client-specific", "client-specific", "client-specific"],
+      "exampleQueries": [
+        "What moved in the [client] competitive landscape this week?",
+        "Which competitors just changed positioning?",
+        "Show me a 30-day pricing trend for [competitor]",
+        "What should we put in this month's competitive brief for [client]?"
+      ],
+      "tactics": [
+        "Use the per-client Team tier (5 seats, $199/mo) when it launches",
+        "Generate monthly client-facing PDFs using the chart exports",
+        "Track category leaders (e.g. Salesforce for CRM clients) not just direct competitors",
+        "Add a 'seen by [client]' annotation when you share an alert in a client call"
+      ]
+    },
+    {
+      "slug": "fintech",
+      "name": "Fintech",
+      "headline": "Track regulatory-driven pricing changes in real time",
+      "painPoint": "Fintech pricing changes follow rate hikes, regulatory shifts, and competitive moves. By the time you read a competitor's blog post, the new rate is already live on their pricing page.",
+      "workflow": "Monitor pricing pages for transaction fees, interest rates, account fees, and FX margins. RivalEye detects changes within 24 hours and briefs you on whether it is competitive or regulatory.",
+      "topCompetitors": ["stripe", "wise", "plaid", "marqeta", "adyen", "checkout-com", "circle", "coinbase"],
+      "exampleQueries": [
+        "Who changed transaction fees this quarter?",
+        "Which neobanks raised their FX margin?",
+        "Are competitors adding crypto trading fees?",
+        "Who added a no-monthly-fee tier?"
+      ],
+      "tactics": [
+        "Track pricing across 4 regions — fintech pricing varies hugely by jurisdiction",
+        "Set alerts for pricing change + blog post within 7 days — that is a coordinated move",
+        "Watch for fee restructuring, not just price changes (e.g. 3% + $0.30 → 2.5% + $0.50 is significant)",
+        "Cross-reference with rate-cut announcements to know if it is competitive or forced"
+      ]
+    },
+    {
+      "slug": "devtools",
+      "name": "Dev Tools",
+      "headline": "Track pricing changes across the dev tool ecosystem",
+      "painPoint": "Dev tools change pricing constantly — free tiers, usage-based add-ons, AI feature paywalls. It's hard to know if your pricing is still competitive without a full-time analyst.",
+      "workflow": "RivalEye tracks dev tool pricing pages, detects new SKUs (e.g. AI credits), and briefs you on positioning shifts. Use the RAG search to find every competitor that added AI to their pricing in the last 90 days.",
+      "topCompetitors": ["github-copilot", "cursor", "vercel", "netlify", "linear", "datadog", "sentry", "posthog", "clerk"],
+      "exampleQueries": [
+        "Which dev tools added AI credits to their pricing this year?",
+        "Who removed their free tier in the last 6 months?",
+        "Which competitors switched from per-seat to usage-based?",
+        "Who is offering free AI features that we charge for?"
+      ],
+      "tactics": [
+        "Track the AI credits SKU specifically — it is the new battleground",
+        "Watch for free-tier downgrades (often a sign of monetization pressure)",
+        "Geo-aware tracking matters: EU has different willingness-to-pay than US",
+        "Use the semantic search to find every AI pricing change in the last 90 days"
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "slug": "in-india",
+      "name": "India",
+      "code": "IN",
+      "currency": "INR",
+      "notes": "Often 40-60% lower pricing in INR. Many global SaaS now publish India-specific pages."
+    },
+    {
+      "slug": "in-eu",
+      "name": "Europe",
+      "code": "EU",
+      "currency": "EUR",
+      "notes": "GDPR-driven localization. EU prices often include VAT which inflates displayed numbers."
+    },
+    {
+      "slug": "in-us",
+      "name": "United States",
+      "code": "US",
+      "currency": "USD",
+      "notes": "Anchor market for most SaaS. US pricing is usually the headline number."
+    },
+    {
+      "slug": "in-brazil",
+      "name": "Brazil",
+      "code": "BR",
+      "currency": "BRL",
+      "notes": "Emerging market with aggressive BRL pricing (often 50%+ off USD)."
+    },
+    {
+      "slug": "in-latin-america",
+      "name": "Latin America",
+      "code": "LATAM",
+      "currency": "USD",
+      "notes": "Often USD-priced but with regional payment methods (Pix, Boleto)."
+    }
+  ]
+}
