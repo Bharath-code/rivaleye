@@ -3,6 +3,7 @@ import { Outfit, Space_Mono, Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
 import { SmoothScroll } from "@/components/providers/SmoothScroll";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 import Script from "next/script";
 import "./globals.css";
 
@@ -100,13 +101,15 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        <AnalyticsProvider>
-          <SmoothScroll>
-            <main id="main-content">
-              {children}
-            </main>
-          </SmoothScroll>
-        </AnalyticsProvider>
+        <QueryProvider>
+          <AnalyticsProvider>
+            <SmoothScroll>
+              <main id="main-content">
+                {children}
+              </main>
+            </SmoothScroll>
+          </AnalyticsProvider>
+        </QueryProvider>
         <Toaster position="bottom-right" />
         {/* Aria live region for dynamic announcements */}
         <div aria-live="polite" aria-atomic="true" className="sr-only" id="announcer" />

@@ -1,10 +1,11 @@
 import { task, logger, metadata } from "@trigger.dev/sdk/v3";
 import { chromium } from "playwright";
-import { createHash } from "crypto";
+import { hashAnalysis } from "@/lib/crawler/hashAnalysis";
+import type { CompetitorAnalysis } from "@/lib/ai/visionAnalyzer";
 
 /**
  * On-Demand Competitor Analysis Task
- * 
+ *
  * Triggered from API for single competitor analysis with realtime progress.
  */
 
@@ -13,50 +14,6 @@ interface AnalyzePayload {
     competitorUrl: string;
     competitorName: string;
     userId: string;
-}
-
-interface PricingPlan {
-    name: string;
-    price: string;
-    period?: string;
-    credits?: string;
-    features: string[];
-}
-
-interface CompetitorAnalysis {
-    companyName: string;
-    tagline?: string;
-    pricing: {
-        plans: PricingPlan[];
-        promotions?: string[];
-    };
-    features: {
-        highlighted: string[];
-        differentiators: string[];
-    };
-    positioning: {
-        targetAudience?: string;
-        valueProposition?: string;
-        socialProof?: string[];
-    };
-    insights: string[];
-    summary: string;
-}
-
-function hashAnalysis(analysis: CompetitorAnalysis): string {
-    const keyData = {
-        pricing: analysis.pricing?.plans?.map(p => ({
-            name: p.name,
-            price: p.price,
-            credits: p.credits,
-        })),
-        features: analysis.features?.highlighted,
-        positioning: analysis.positioning?.valueProposition,
-    };
-
-    return createHash("sha256")
-        .update(JSON.stringify(keyData))
-        .digest("hex");
 }
 
 export const analyzeCompetitorTask = task({

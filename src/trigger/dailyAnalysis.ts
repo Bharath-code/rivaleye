@@ -1,61 +1,17 @@
 import { schedules, logger, metadata } from "@trigger.dev/sdk/v3";
 import { chromium } from "playwright";
-import { createHash } from "crypto";
+import { hashAnalysis } from "@/lib/crawler/hashAnalysis";
+import type { CompetitorAnalysis } from "@/lib/ai/visionAnalyzer";
 
 /**
  * Daily Competitor Analysis Task with Realtime Progress
  *
  * Runs every day at 6:00 AM UTC.
  * Reports progress via metadata for realtime UI updates.
+ *
+ * NOTE: change-detection uses the shared hashAnalysis() from
+ * lib/crawler/hashAnalysis.ts — don't re-declare it here.
  */
-
-// Types
-interface PricingPlan {
-    name: string;
-    price: string;
-    period?: string;
-    credits?: string;
-    features: string[];
-}
-
-interface CompetitorAnalysis {
-    companyName: string;
-    tagline?: string;
-    pricing: {
-        plans: PricingPlan[];
-        billingOptions?: string[];
-        currency?: string;
-        promotions?: string[];
-    };
-    features: {
-        highlighted: string[];
-        differentiators: string[];
-    };
-    positioning: {
-        targetAudience?: string;
-        valueProposition?: string;
-        socialProof?: string[];
-    };
-    insights: string[];
-    summary: string;
-}
-
-// Hash for change detection
-function hashAnalysis(analysis: CompetitorAnalysis): string {
-    const keyData = {
-        pricing: analysis.pricing?.plans?.map(p => ({
-            name: p.name,
-            price: p.price,
-            credits: p.credits,
-        })),
-        features: analysis.features?.highlighted,
-        positioning: analysis.positioning?.valueProposition,
-    };
-
-    return createHash("sha256")
-        .update(JSON.stringify(keyData))
-        .digest("hex");
-}
 
 // Detect changes
 function detectChanges(

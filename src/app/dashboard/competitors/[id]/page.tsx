@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import { cn } from "@/lib/utils";
 
 interface CompetitorDetails {
     competitor: {
@@ -51,6 +52,8 @@ interface CompetitorDetails {
     };
     performance: {
         data: any;
+        score: number | null;
+        extractedAt: string | null;
     };
     alerts: any[];
 }
@@ -345,10 +348,48 @@ export default function CompetitorDetailPage() {
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-muted-foreground text-sm">
-                                    Core Web Vitals coming soon.
-                                </p>
-                                {/* TODO: Add performance metrics when PSI integration is complete */}
+                                {data.performance?.data ? (
+                                    <div className="space-y-3">
+                                        {data.performance.score !== null && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-muted-foreground uppercase tracking-wider">PSI Score</span>
+                                                <Badge
+                                                    className={cn(
+                                                        "text-base font-bold",
+                                                        data.performance.score >= 90 && "bg-emerald-500/20 text-emerald-300",
+                                                        data.performance.score >= 50 && data.performance.score < 90 && "bg-amber-500/20 text-amber-300",
+                                                        data.performance.score < 50 && "bg-red-500/20 text-red-300"
+                                                    )}
+                                                >
+                                                    {data.performance.score}
+                                                </Badge>
+                                            </div>
+                                        )}
+                                        {data.performance.data.coreWebVitals && (
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {(["lcp", "fid", "cls"] as const).map((key) => {
+                                                    const v = data.performance.data.coreWebVitals[key];
+                                                    if (v == null) return null;
+                                                    return (
+                                                        <div key={key} className="text-center p-2 rounded-md bg-white/[0.02] border border-white/5">
+                                                            <div className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">{key}</div>
+                                                            <div className="text-sm font-mono mt-1">{v}</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                        {data.performance.extractedAt && (
+                                            <p className="text-[11px] text-muted-foreground italic">
+                                                Measured {new Date(data.performance.extractedAt).toLocaleDateString()}
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-muted-foreground text-sm">
+                                        Performance data will appear after the next deep-audit run.
+                                    </p>
+                                )}
                             </CardContent>
                         </Card>
                     </div>

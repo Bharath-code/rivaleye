@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
  * Extracted from dashboard page for reusability and maintainability.
  */
 
-interface AnalysisResult {
+export interface AnalysisResult {
     companyName?: string;
     tagline?: string;
     pricing?: {

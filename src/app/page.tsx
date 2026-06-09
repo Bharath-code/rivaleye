@@ -143,15 +143,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Social Proof – Early Stage Credibility */}
+      {/* Honest feature callouts (no fabricated stats) */}
       <section className="py-12 px-6 gsap-reveal">
         <div className="max-w-4xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
-              { value: "500+", label: "Pages Monitored", icon: Eye },
               { value: "4", label: "Global Regions", icon: Globe2 },
-              { value: "1,200+", label: "Alerts Generated", icon: Bell },
-              { value: "99.8%", label: "Uptime SLA", icon: Shield },
+              { value: "Daily", label: "Automated Checks", icon: Bell },
+              { value: "AI", label: "Tactical Briefs", icon: Sparkles },
+              { value: "1 Free", label: "Track Forever", icon: Shield },
             ].map((stat, i) => (
               <div
                 key={i}

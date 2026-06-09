@@ -2,29 +2,11 @@ import { NextResponse } from "next/server";
 import { getUserId } from "@/lib/auth";
 import { createServerClient } from "@/lib/supabase";
 import { captureAndAnalyze, type CompetitorAnalysis } from "@/lib/ai/visionAnalyzer";
-import { createHash } from "crypto";
+import { hashAnalysis } from "@/lib/crawler/hashAnalysis";
 import { getUserWithQuota, canManualCheck, incrementManualCheckCount } from "@/lib/quotas";
 import { detectManualSpam } from "@/lib/abuseDetection";
 import { checkRateLimit, RATE_LIMITS, rateLimitHeaders } from "@/lib/rateLimit";
-
-/**
- * Create a hash of the key analysis fields for change detection
- */
-function hashAnalysis(analysis: CompetitorAnalysis): string {
-    const keyData = {
-        pricing: analysis.pricing?.plans?.map(p => ({
-            name: p.name,
-            price: p.price,
-            credits: p.credits,
-        })),
-        features: analysis.features?.highlighted,
-        positioning: analysis.positioning?.valueProposition,
-    };
-
-    return createHash("sha256")
-        .update(JSON.stringify(keyData))
-        .digest("hex");
-}
+import { parseBody, analyzeCompetitorSchema } from "@/lib/validation/schemas";
 
 /**
  * POST /api/analyze-competitor
@@ -69,15 +51,9 @@ export async function POST(request: Request) {
         }
 
         // ── 3. Body validation ──
-        const body = await request.json();
-        const { competitorId } = body;
-
-        if (!competitorId || typeof competitorId !== "string") {
-            return NextResponse.json(
-                { error: "competitorId is required" },
-                { status: 400 }
-            );
-        }
+        const parsed = await parseBody(request, analyzeCompetitorSchema);
+        if (parsed.error) return parsed.error;
+        const { competitorId } = parsed.data;
 
         const supabase = createServerClient();
 

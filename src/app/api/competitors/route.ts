@@ -5,6 +5,9 @@ import { analyzeCompetitorTask } from "@/trigger/analyzeCompetitor";
 import { checkRateLimit, RATE_LIMITS, rateLimitHeaders } from "@/lib/rateLimit";
 import { validateCompetitorUrl } from "@/lib/urlValidator";
 import { getFeatureFlags } from "@/lib/billing/featureFlags";
+import { withRequestId, withUser } from "@/lib/logger";
+import { parseBody, parseQuery, createCompetitorSchema, queryIdSchema } from "@/lib/validation/schemas";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Competitors API
@@ -12,6 +15,9 @@ import { getFeatureFlags } from "@/lib/billing/featureFlags";
  * GET - List user's competitors
  * POST - Add new competitor (triggers first crawl)
  * DELETE - Remove competitor
+ *
+ * All handlers use structured logging (pino) with request-id correlation
+ * and capture exceptions to Sentry on the 5xx path.
  */
 
 /**
@@ -27,7 +33,6 @@ async function ensureUserExists(userId: string): Promise<void> {
         .single();
 
     if (!existingUser) {
-        // Get user email directly from Supabase Auth (admin API)
         const { data: authData } = await supabase.auth.admin.getUserById(userId);
         const email = authData?.user?.email || `user-${userId}@temp.local`;
 
@@ -46,18 +51,22 @@ async function ensureUserExists(userId: string): Promise<void> {
 }
 
 // GET /api/competitors
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const { log, headers: reqHeaders } = withRequestId(request, "GET /api/competitors");
     try {
         const userId = await getUserId();
-
         if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            log.warn("unauthorized GET /api/competitors");
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401, headers: reqHeaders }
+            );
         }
 
+        const userLog = withUser(log, userId);
         await ensureUserExists(userId);
 
         const supabase = createServerClient();
-
         const { data: competitors, error } = await supabase
             .from("competitors")
             .select("*")
@@ -65,8 +74,12 @@ export async function GET() {
             .order("created_at", { ascending: false });
 
         if (error) {
-            console.error("Error fetching competitors:", error);
-            return NextResponse.json({ error: "Failed to fetch competitors" }, { status: 500 });
+            userLog.error({ err: error }, "failed to fetch competitors");
+            Sentry.captureException(error);
+            return NextResponse.json(
+                { error: "Failed to fetch competitors" },
+                { status: 500, headers: reqHeaders }
+            );
         }
 
         const { data: user } = await supabase
@@ -75,28 +88,40 @@ export async function GET() {
             .eq("id", userId)
             .single();
 
-        return NextResponse.json({
-            competitors,
-            plan: user?.plan || "free"
-        });
-    } catch (error) {
-        console.error("Unexpected error:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        userLog.debug({ count: competitors?.length ?? 0 }, "fetched competitors");
+
+        return NextResponse.json(
+            { competitors, plan: user?.plan || "free" },
+            { headers: reqHeaders }
+        );
+    } catch (err) {
+        log.error({ err }, "unexpected error in GET /api/competitors");
+        Sentry.captureException(err);
+        return NextResponse.json(
+            { error: "Internal server error" },
+            { status: 500, headers: reqHeaders }
+        );
     }
 }
 
 // POST /api/competitors
 export async function POST(request: NextRequest) {
+    const { log, headers: reqHeaders } = withRequestId(request, "POST /api/competitors");
     try {
         const userId = await getUserId();
-
         if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            log.warn("unauthorized POST /api/competitors");
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401, headers: reqHeaders }
+            );
         }
+        const userLog = withUser(log, userId);
 
         // Rate limit
         const rateCheck = checkRateLimit(`competitors:${userId}`, RATE_LIMITS.competitors);
         if (!rateCheck.allowed) {
+            userLog.warn({ rateCheck }, "rate limit hit on POST /api/competitors");
             return NextResponse.json(
                 { error: "Too many requests. Please slow down." },
                 {
@@ -104,6 +129,7 @@ export async function POST(request: NextRequest) {
                     headers: {
                         "Retry-After": String(Math.ceil(rateCheck.resetMs / 1000)),
                         ...rateLimitHeaders(rateCheck, RATE_LIMITS.competitors),
+                        ...reqHeaders,
                     },
                 }
             );
@@ -111,29 +137,28 @@ export async function POST(request: NextRequest) {
 
         await ensureUserExists(userId);
 
-        const body = await request.json();
-        const { name, url } = body;
-
-        if (!name || !url) {
+        const parsed = await parseBody(request, createCompetitorSchema);
+        if (parsed.error) {
             return NextResponse.json(
-                { error: "Name and URL are required" },
-                { status: 400 }
+                await parsed.error.json(),
+                { status: 400, headers: reqHeaders }
             );
         }
+        const { name, url } = parsed.data;
 
         // Validate URL (SSRF protection)
         const urlValidation = validateCompetitorUrl(url);
         if (!urlValidation.valid) {
+            userLog.warn({ url, error: urlValidation.error }, "url validation failed");
             return NextResponse.json(
                 { error: urlValidation.error },
-                { status: 400 }
+                { status: 400, headers: reqHeaders }
             );
         }
         const safeUrl = urlValidation.sanitizedUrl!;
 
         const supabase = createServerClient();
 
-        // Check user's plan limits
         const { data: user } = await supabase
             .from("users")
             .select("plan")
@@ -149,13 +174,13 @@ export async function POST(request: NextRequest) {
         const flags = getFeatureFlags(userPlan);
 
         if ((existingCount ?? 0) >= flags.maxCompetitors) {
+            userLog.info({ userPlan, existingCount, max: flags.maxCompetitors }, "competitor limit hit");
             return NextResponse.json(
                 { error: `Free plan limited to ${flags.maxCompetitors} competitor. Upgrade to Pro for more.` },
-                { status: 403 }
+                { status: 403, headers: reqHeaders }
             );
         }
 
-        // Insert competitor
         const { data: competitor, error } = await supabase
             .from("competitors")
             .insert({
@@ -169,9 +194,15 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (error) {
-            console.error("Error creating competitor:", error);
-            return NextResponse.json({ error: "Failed to create competitor" }, { status: 500 });
+            userLog.error({ err: error }, "failed to insert competitor");
+            Sentry.captureException(error);
+            return NextResponse.json(
+                { error: "Failed to create competitor" },
+                { status: 500, headers: reqHeaders }
+            );
         }
+
+        userLog.info({ competitorId: competitor.id, name }, "competitor created");
 
         // Trigger first crawl asynchronously (fire-and-forget)
         try {
@@ -181,41 +212,51 @@ export async function POST(request: NextRequest) {
                 competitorName: competitor.name,
                 userId,
             });
-            console.log(`[Competitors] Triggered first analysis for ${competitor.name}`);
+            userLog.info({ competitorId: competitor.id }, "first analysis triggered");
         } catch (triggerError) {
+            userLog.error({ err: triggerError, competitorId: competitor.id }, "failed to trigger first analysis");
+            Sentry.captureException(triggerError);
             // Non-blocking: log but don't fail the request
-            console.error("Failed to trigger first analysis:", triggerError);
         }
 
-        return NextResponse.json({ competitor }, { status: 201 });
-    } catch (error) {
-        console.error("Unexpected error:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json(
+            { competitor },
+            { status: 201, headers: reqHeaders }
+        );
+    } catch (err) {
+        log.error({ err }, "unexpected error in POST /api/competitors");
+        Sentry.captureException(err);
+        return NextResponse.json(
+            { error: "Internal server error" },
+            { status: 500, headers: reqHeaders }
+        );
     }
 }
 
 // DELETE /api/competitors?id=xxx
 export async function DELETE(request: NextRequest) {
+    const { log, headers: reqHeaders } = withRequestId(request, "DELETE /api/competitors");
     try {
         const userId = await getUserId();
-
         if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
-        const { searchParams } = new URL(request.url);
-        const id = searchParams.get("id");
-
-        if (!id) {
             return NextResponse.json(
-                { error: "Competitor ID is required" },
-                { status: 400 }
+                { error: "Unauthorized" },
+                { status: 401, headers: reqHeaders }
             );
         }
+        const userLog = withUser(log, userId);
+
+        const parsed = parseQuery(request, queryIdSchema);
+        if (parsed.error) {
+            return NextResponse.json(
+                await parsed.error.json(),
+                { status: 400, headers: reqHeaders }
+            );
+        }
+        const { id } = parsed.data;
 
         const supabase = createServerClient();
 
-        // Verify ownership before delete
         const { data: competitor } = await supabase
             .from("competitors")
             .select("user_id")
@@ -223,7 +264,11 @@ export async function DELETE(request: NextRequest) {
             .single();
 
         if (!competitor || competitor.user_id !== userId) {
-            return NextResponse.json({ error: "Not found" }, { status: 404 });
+            userLog.warn({ id }, "delete attempt on non-owned competitor");
+            return NextResponse.json(
+                { error: "Not found" },
+                { status: 404, headers: reqHeaders }
+            );
         }
 
         const { error } = await supabase
@@ -232,13 +277,22 @@ export async function DELETE(request: NextRequest) {
             .eq("id", id);
 
         if (error) {
-            console.error("Error deleting competitor:", error);
-            return NextResponse.json({ error: "Failed to delete competitor" }, { status: 500 });
+            userLog.error({ err: error, id }, "failed to delete competitor");
+            Sentry.captureException(error);
+            return NextResponse.json(
+                { error: "Failed to delete competitor" },
+                { status: 500, headers: reqHeaders }
+            );
         }
 
-        return NextResponse.json({ success: true });
-    } catch (error) {
-        console.error("Unexpected error:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        userLog.info({ id }, "competitor deleted");
+        return NextResponse.json({ success: true }, { headers: reqHeaders });
+    } catch (err) {
+        log.error({ err }, "unexpected error in DELETE /api/competitors");
+        Sentry.captureException(err);
+        return NextResponse.json(
+            { error: "Internal server error" },
+            { status: 500, headers: reqHeaders }
+        );
     }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase";
+import { parseBody, authSyncSchema } from "@/lib/validation/schemas";
 
 /**
  * Auth Sync API
@@ -11,12 +12,9 @@ import { createServerClient } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { accessToken, refreshToken } = body;
-
-        if (!accessToken || !refreshToken) {
-            return NextResponse.json({ error: "Missing tokens" }, { status: 400 });
-        }
+        const parsed = await parseBody(request, authSyncSchema);
+        if (parsed.error) return parsed.error;
+        const { accessToken, refreshToken } = parsed.data;
 
         // Set cookies for session persistence
         const cookieStore = await cookies();

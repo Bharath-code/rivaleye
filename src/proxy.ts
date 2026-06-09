@@ -19,17 +19,24 @@ const PUBLIC_ROUTES = new Set([
     "/login",
     "/auth",
     "/auth/callback",
+    "/track",
 ]);
 
 const PUBLIC_API_ROUTES = new Set([
     "/api/webhook",
     "/api/auth",
     "/api/checkout",
-    "/api/cron",
+    "/api/public",
+    // Note: /api/cron removed — handler deleted, no callers. Daily jobs
+    // run via Trigger.dev schedules (src/trigger/dailyAnalysis.ts,
+    // src/trigger/dailyPricingAnalysis.ts), not via Next API routes.
 ]);
 
 function isPublicRoute(pathname: string): boolean {
     if (PUBLIC_ROUTES.has(pathname)) return true;
+
+    // Public tracker pages (viral wedge): /track/[slug]
+    if (pathname.startsWith("/track/")) return true;
 
     for (const route of PUBLIC_API_ROUTES) {
         if (pathname.startsWith(route)) return true;

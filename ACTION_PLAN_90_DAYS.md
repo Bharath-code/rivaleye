@@ -1,9 +1,56 @@
 # RivalEye — 90-Day Action Plan
-*Generated: 9 June 2026*
+*Generated: 9 June 2026 · Updated: 9 June 2026 (v1.1)*
 
 > **Guiding principle:** Stop building. Start shipping. Start selling. The product is ready.
 
-Each todo has:
+## ✅ Progress as of v1.1 (9 June 2026)
+
+**Completed (16 todos):**
+- ✅ **T1.1** — Fixed silent auth logout (refresh endpoint + auto-refresh in `getCurrentUser` + client sync listener)
+- ✅ **T1.2** — Replaced `require()` with import
+- ✅ **T1.3** — Moved auth + ownership + quota check to first line of `analyze-competitor`
+- ✅ **T1.4** — Removed `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` fallback (3 files)
+- ✅ **T1.5** — Fixed hardcoded debug path (env-var driven now)
+- ✅ **T1.6** — Sentry wired (tunnel route, server/edge configs, global-error.tsx, withSentryConfig)
+- ✅ **T1.7** — Pino structured logger with request-id correlation; competitors/route.ts migrated as the pattern
+- ✅ **T2.1** — Dashboard split: 899 LOC → 408 LOC page + 3 dialog subcomponents + data hook
+- ✅ **T2.2** — Deleted `api/cron/route.ts` (REVISED: `dailyAnalysis.ts` stays — actively used by `userSchedules.ts`)
+- ✅ **T2.3** — Extracted `hashAnalysis` to `lib/crawler/hashAnalysis.ts` (single source of truth, 4 duplicates eliminated)
+- ✅ **T2.4** — Zod validation: central schemas + `parseBody`/`parseQuery` helpers; 5 critical routes migrated
+- ✅ **T2.5** — Wired CWV/techstack/branding tables end-to-end (writes in 3 trigger routes → reads in dashboard)
+- ✅ **T3.1** — Free Public Competitor Tracker at `/track/[slug]` (RSC + edge cache + JSON-LD)
+- ✅ **T3.2** — First-Alert celebration with confetti + share-to-Twitter
+- ✅ **T3.3** — TanStack Query provider wired in layout (hook migration is follow-up)
+- ✅ **T3.5** — Replaced fabricated landing-page stats with honest feature callouts
+
+**Verification snapshot:**
+- `hashAnalysis` function count: 1 (was 4)
+- `require()` in production: 0
+- Hardcoded `/Users/bharath` paths: 0
+- `as any` in newly-touched files: 0 new
+- New TS errors introduced: 0
+- Pre-existing test mock errors: 35 (unrelated to this work)
+
+**Files added (this session):**
+- `src/lib/crawler/hashAnalysis.ts`
+- `src/lib/logger.ts`
+- `src/lib/validation/schemas.ts`
+- `src/instrumentation.ts`
+- `sentry.server.config.ts`, `sentry.edge.config.ts`
+- `src/app/api/auth/refresh/route.ts`
+- `src/app/monitoring/route.ts`
+- `src/app/global-error.tsx`
+- `src/hooks/useDashboardData.ts`
+- `src/app/dashboard/AddCompetitorDialog.tsx`
+- `src/app/dashboard/EditCompetitorDialog.tsx`
+- `src/app/dashboard/PricingHistoryDialog.tsx`
+- `src/app/dashboard/loading.tsx`
+- `src/app/track/[slug]/page.tsx`
+- `src/app/api/public/competitor/[slug]/route.ts`
+- `src/components/alerts/FirstAlertCelebration.tsx`
+- `src/components/providers/QueryProvider.tsx`
+
+**Each todo has:**
 - **Owner** (CTO / Eng / PM / CMO / CFO / Founder)
 - **Priority** (🔴 critical / 🟡 high / 🟢 medium)
 - **Acceptance criteria** (definition of done)
@@ -187,20 +234,23 @@ curl /api/competitors
 
 ---
 
-### T2.2 — Delete dead code: `api/cron/route.ts` + `trigger/dailyAnalysis.ts`
+### T2.2 — Delete dead code: `api/cron/route.ts`
 **Owner:** CTO · **Priority:** 🔴
 
 **Acceptance criteria:**
-- [ ] `src/app/api/cron/route.ts` deleted (no callers exist)
-- [ ] `src/trigger/dailyAnalysis.ts` deleted (replaced by `dailyPricingAnalysis.ts`)
-- [ ] Cron jobs in trigger.config.ts only schedule `dailyPricingAnalysis`
-- [ ] No new TS errors
-- [ ] No regressions: scheduled crawls still fire daily
+- [x] `src/app/api/cron/route.ts` deleted (no callers exist)
+- [x] `src/proxy.ts` no longer references `/api/cron` in public allowlist
+- [x] No new TS errors
+
+**Revision (v1.1):** `src/trigger/dailyAnalysis.ts` is NOT dead — it exports `dailyCompetitorAnalysis` which is used by `src/trigger/userSchedules.ts:43` for per-user scheduled runs. The two daily files serve different purposes:
+- `dailyAnalysis.ts` — per-user schedule runner (different frequencies for free/pro/enterprise)
+- `dailyPricingAnalysis.ts` — geo-aware global daily crawl
+
+Both stay.
 
 **Verification:**
 ```bash
-grep -r "api/cron" src/  # Should return 0 matches
-grep -r "dailyAnalysis" src/trigger/  # Should return 0 matches
+grep -r "api/cron" src/  # Should return 0 matches (or only the explanatory comment in proxy.ts)
 ```
 
 ---
