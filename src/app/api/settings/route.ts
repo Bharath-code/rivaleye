@@ -4,6 +4,10 @@ import { getUserId } from "@/lib/auth";
 import type { UserSettings } from "@/lib/types";
 import { DEFAULT_USER_SETTINGS } from "@/lib/types";
 import { encryptWebhookUrl, decryptWebhookUrl } from "@/lib/encryption";
+import { parseBody, updateSettingsSchema } from "@/lib/validation/schemas";
+import { assertSameOrigin } from "@/lib/csrf";
+import { withRequestId, withUser } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Settings API
@@ -56,54 +60,60 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
+    const { log, headers: reqHeaders } = withRequestId(request, "PATCH /api/settings");
     try {
+        const csrf = assertSameOrigin(request);
+        if (csrf) return csrf;
+
         const userId = await getUserId();
-
         if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401, headers: reqHeaders }
+            );
         }
+        const userLog = withUser(log, userId);
 
-        const body = await request.json();
+        const parsed = await parseBody(request, updateSettingsSchema);
+        if (parsed.error) {
+            return NextResponse.json(
+                await parsed.error.json(),
+                { status: 400, headers: reqHeaders }
+            );
+        }
         const updates: Partial<UserSettings> = {};
 
-        // Validate and extract allowed fields
-        if (typeof body.email_enabled === "boolean") {
-            updates.email_enabled = body.email_enabled;
+        if (parsed.data.email_enabled !== undefined) {
+            updates.email_enabled = parsed.data.email_enabled;
         }
-
-        if (body.digest_frequency && ["instant", "daily", "weekly"].includes(body.digest_frequency)) {
-            updates.digest_frequency = body.digest_frequency;
+        if (parsed.data.digest_frequency !== undefined) {
+            updates.digest_frequency = parsed.data.digest_frequency;
         }
-
-        if (body.slack_webhook_url !== undefined) {
-            // Validate Slack webhook URL format if provided
-            if (body.slack_webhook_url === null || body.slack_webhook_url === "") {
+        if (parsed.data.slack_webhook_url !== undefined) {
+            // Empty string → null (cleared)
+            if (parsed.data.slack_webhook_url === "" || parsed.data.slack_webhook_url === null) {
                 updates.slack_webhook_url = null;
-            } else if (typeof body.slack_webhook_url === "string" && body.slack_webhook_url.startsWith("https://hooks.slack.com/")) {
-                // Encrypt the webhook URL before storing
-                const encrypted = encryptWebhookUrl(body.slack_webhook_url);
+            } else {
+                const encrypted = encryptWebhookUrl(parsed.data.slack_webhook_url);
                 if (!encrypted) {
+                    userLog.error("encryption failed for slack webhook");
                     return NextResponse.json(
                         { error: "Failed to secure webhook URL. Please try again." },
-                        { status: 500 }
+                        { status: 500, headers: reqHeaders }
                     );
                 }
                 updates.slack_webhook_url = encrypted;
-            } else {
-                return NextResponse.json(
-                    { error: "Invalid Slack webhook URL. Must start with https://hooks.slack.com/" },
-                    { status: 400 }
-                );
             }
         }
 
         if (Object.keys(updates).length === 0) {
-            return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+            return NextResponse.json(
+                { error: "No valid fields to update" },
+                { status: 400, headers: reqHeaders }
+            );
         }
 
         const supabase = createServerClient();
-
-        // Get current settings and merge
         const { data: currentUser } = await supabase
             .from("users")
             .select("settings")
@@ -113,20 +123,31 @@ export async function PATCH(request: NextRequest) {
         const currentSettings = currentUser?.settings || DEFAULT_USER_SETTINGS;
         const newSettings = { ...currentSettings, ...updates };
 
-        // Update settings
         const { error } = await supabase
             .from("users")
             .update({ settings: newSettings })
             .eq("id", userId);
 
         if (error) {
-            console.error("Error updating settings:", error);
-            return NextResponse.json({ error: "Failed to update settings" }, { status: 500 });
+            userLog.error({ err: error }, "failed to update settings");
+            Sentry.captureException(error);
+            return NextResponse.json(
+                { error: "Failed to update settings" },
+                { status: 500, headers: reqHeaders }
+            );
         }
 
-        return NextResponse.json({ settings: newSettings, message: "Settings updated" });
-    } catch (error) {
-        console.error("Unexpected error:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        userLog.info({ fields: Object.keys(updates) }, "settings updated");
+        return NextResponse.json(
+            { settings: newSettings, message: "Settings updated" },
+            { headers: reqHeaders }
+        );
+    } catch (err) {
+        log.error({ err }, "unexpected error in PATCH /api/settings");
+        Sentry.captureException(err);
+        return NextResponse.json(
+            { error: "Internal server error" },
+            { status: 500, headers: reqHeaders }
+        );
     }
 }

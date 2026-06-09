@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
  *
  * Layer 1 of auth defense:
  * - Blocks unauthenticated requests to /dashboard/* and protected /api/* routes
- * - Sets security headers on all responses
+ * - Sets security headers on all responses (CSP, HSTS, X-Frame-Options, etc.)
  *
  * Token refresh happens in lib/auth.ts:getCurrentUser() at the server-component
  * / API-route level (where cookies() writes are visible to the response).
@@ -54,6 +54,16 @@ function isPublicRoute(pathname: string): boolean {
     return false;
 }
 
+const SECURITY_HEADERS: ReadonlyArray<{ key: string; value: string }> = [
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "X-Frame-Options", value: "DENY" },
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+    },
+];
+
 export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
@@ -64,26 +74,34 @@ export function proxy(request: NextRequest) {
     const accessToken = request.cookies.get("sb-access-token")?.value;
     const refreshToken = request.cookies.get("sb-refresh-token")?.value;
 
-    // No session cookies at all → redirect/401
     if (!accessToken && !refreshToken) {
         if (pathname.startsWith("/api/")) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 }
+            return setSecurityHeaders(
+                NextResponse.json(
+                    { error: "Unauthorized" },
+                    { status: 401 }
+                )
             );
         }
         const loginUrl = new URL("/login", request.url);
         loginUrl.searchParams.set("redirect", pathname);
-        return NextResponse.redirect(loginUrl);
+        return setSecurityHeaders(NextResponse.redirect(loginUrl));
     }
 
     return setSecurityHeaders(NextResponse.next());
 }
 
 function setSecurityHeaders(response: NextResponse): NextResponse {
-    response.headers.set("X-Content-Type-Options", "nosniff");
-    response.headers.set("X-Frame-Options", "DENY");
-    response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    for (const { key, value } of SECURITY_HEADERS) {
+        response.headers.set(key, value);
+    }
+    // HSTS only in prod (no effect on localhost)
+    if (process.env.NODE_ENV === "production") {
+        response.headers.set(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains; preload"
+        );
+    }
     return response;
 }
 

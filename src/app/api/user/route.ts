@@ -1,26 +1,31 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import { getUserId, getCurrentUser } from "@/lib/auth";
-import { decryptWebhookUrl } from "@/lib/encryption";
+import { getUserId } from "@/lib/auth";
+import { assertSameOrigin } from "@/lib/csrf";
+import { withRequestId, withUser } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * User Data API
- * 
- * GET /api/user/export - GDPR data export (all user data)
+ *
+ * GET /api/user - GDPR data export (all user data)
  * DELETE /api/user - Account deletion (removes all user data)
  */
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const { log, headers: reqHeaders } = withRequestId(request, "GET /api/user");
     try {
         const userId = await getUserId();
 
         if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401, headers: reqHeaders }
+            );
         }
 
         const supabase = createServerClient();
 
-        // Fetch all user data
         const [
             { data: user },
             { data: competitors },
@@ -34,10 +39,12 @@ export async function GET() {
         ]);
 
         if (!user) {
-            return NextResponse.json({ error: "User not found" }, { status: 404 });
+            return NextResponse.json(
+                { error: "User not found" },
+                { status: 404, headers: reqHeaders }
+            );
         }
 
-        // Sanitize settings (decrypt and redact sensitive data)
         const sanitizedSettings = user.settings ? {
             ...user.settings,
             slack_webhook_url: user.settings.slack_webhook_url
@@ -45,7 +52,6 @@ export async function GET() {
                 : null
         } : null;
 
-        // Build export payload
         const exportData = {
             exportedAt: new Date().toISOString(),
             user: {
@@ -74,7 +80,6 @@ export async function GET() {
                 is_read: a.is_read
             })),
             snapshots_count: snapshots?.length || 0,
-            // Don't include full snapshot data (too large), just metadata
             snapshots_summary: (snapshots || []).slice(0, 10).map(s => ({
                 id: s.id,
                 competitor_id: s.competitor_id,
@@ -83,34 +88,42 @@ export async function GET() {
             }))
         };
 
-        // Return as downloadable JSON
         return new NextResponse(JSON.stringify(exportData, null, 2), {
             status: 200,
             headers: {
                 "Content-Type": "application/json",
-                "Content-Disposition": `attachment; filename="rivaleye-export-${userId}.json"`
-            }
+                "Content-Disposition": `attachment; filename="rivaleye-export-${userId}.json"`,
+                ...reqHeaders,
+            },
         });
-    } catch (error) {
-        console.error("Data export error:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    } catch (err) {
+        log.error({ err }, "data export error");
+        Sentry.captureException(err);
+        return NextResponse.json(
+            { error: "Internal server error" },
+            { status: 500, headers: reqHeaders }
+        );
     }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+    const { log, headers: reqHeaders } = withRequestId(request, "DELETE /api/user");
     try {
+        const csrf = assertSameOrigin(request);
+        if (csrf) return csrf;
+
         const userId = await getUserId();
 
         if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401, headers: reqHeaders }
+            );
         }
+        const userLog = withUser(log, userId);
 
         const supabase = createServerClient();
 
-        // Cascade delete: snapshots → alerts → competitors → user
-        // Note: In production, you'd want RLS and proper cascade constraints
-
-        // 1. Get all competitor IDs for this user
         const { data: competitors } = await supabase
             .from("competitors")
             .select("id")
@@ -119,45 +132,50 @@ export async function DELETE() {
         const competitorIds = (competitors || []).map(c => c.id);
 
         if (competitorIds.length > 0) {
-            // 2. Delete snapshots for these competitors
             await supabase
                 .from("snapshots")
                 .delete()
                 .in("competitor_id", competitorIds);
 
-            // 3. Delete alerts for these competitors
             await supabase
                 .from("alerts")
                 .delete()
                 .in("competitor_id", competitorIds);
 
-            // 4. Delete competitors
             await supabase
                 .from("competitors")
                 .delete()
                 .eq("user_id", userId);
         }
 
-        // 5. Delete user record
         const { error: userDeleteError } = await supabase
             .from("users")
             .delete()
             .eq("id", userId);
 
         if (userDeleteError) {
-            console.error("User deletion error:", userDeleteError);
-            return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
+            userLog.error({ err: userDeleteError }, "user deletion failed");
+            Sentry.captureException(userDeleteError);
+            return NextResponse.json(
+                { error: "Failed to delete account" },
+                { status: 500, headers: reqHeaders }
+            );
         }
 
-        // Log the deletion event
-        console.log(`[GDPR] User account deleted: ${userId}`);
-
-        return NextResponse.json({
-            success: true,
-            message: "Account and all associated data have been permanently deleted."
-        });
-    } catch (error) {
-        console.error("Account deletion error:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        userLog.warn("user account deleted (GDPR)");
+        return NextResponse.json(
+            {
+                success: true,
+                message: "Account and all associated data have been permanently deleted.",
+            },
+            { headers: reqHeaders }
+        );
+    } catch (err) {
+        log.error({ err }, "account deletion error");
+        Sentry.captureException(err);
+        return NextResponse.json(
+            { error: "Internal server error" },
+            { status: 500, headers: reqHeaders }
+        );
     }
 }

@@ -1,35 +1,45 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getUserId } from "@/lib/auth";
 import { createServerClient } from "@/lib/supabase";
+import { parseBody, createScheduleSchema } from "@/lib/validation/schemas";
+import { assertSameOrigin } from "@/lib/csrf";
+import { withRequestId, withUser } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * POST /api/schedule
- * 
+ *
  * Create or update a user's analysis schedule based on their plan.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+    const { log, headers: reqHeaders } = withRequestId(request, "POST /api/schedule");
     try {
+        const csrf = assertSameOrigin(request);
+        if (csrf) return csrf;
+
         const userId = await getUserId();
         if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401, headers: reqHeaders }
+            );
         }
+        const userLog = withUser(log, userId);
 
-        const body = await request.json();
-        const { plan = "free", timezone = "UTC" } = body;
-
-        // Validate plan
-        if (!["free", "pro", "enterprise"].includes(plan)) {
-            return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+        const parsed = await parseBody(request, createScheduleSchema);
+        if (parsed.error) {
+            return NextResponse.json(
+                await parsed.error.json(),
+                { status: 400, headers: reqHeaders }
+            );
         }
+        const { plan, timezone } = parsed.data;
 
-        // Import trigger functions (only on server)
         const { createUserSchedule } = await import("@/trigger/userSchedules");
-
         const result = await createUserSchedule(userId, plan, timezone);
 
-        // Store schedule ID in database for reference
         const supabase = createServerClient();
-        await supabase
+        const { error } = await supabase
             .from("users")
             .update({
                 schedule_id: result.scheduleId,
@@ -37,35 +47,52 @@ export async function POST(request: Request) {
             })
             .eq("id", userId);
 
-        return NextResponse.json({
-            success: true,
-            scheduleId: result.scheduleId,
-            cron: result.cron,
-            plan,
-            timezone,
-        });
-    } catch (error) {
-        console.error("[Schedule API] Error:", error);
+        if (error) {
+            userLog.error({ err: error }, "failed to store schedule_id");
+            Sentry.captureException(error);
+        }
+
+        userLog.info({ plan, timezone, scheduleId: result.scheduleId }, "schedule created");
         return NextResponse.json(
-            { error: error instanceof Error ? error.message : "Failed to create schedule" },
-            { status: 500 }
+            {
+                success: true,
+                scheduleId: result.scheduleId,
+                cron: result.cron,
+                plan,
+                timezone,
+            },
+            { headers: reqHeaders }
+        );
+    } catch (err) {
+        log.error({ err }, "unexpected error in POST /api/schedule");
+        Sentry.captureException(err);
+        return NextResponse.json(
+            { error: err instanceof Error ? err.message : "Failed to create schedule" },
+            { status: 500, headers: reqHeaders }
         );
     }
 }
 
 /**
  * DELETE /api/schedule
- * 
+ *
  * Deactivate a user's schedule (e.g., on subscription cancel)
  */
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
+    const { log, headers: reqHeaders } = withRequestId(request, "DELETE /api/schedule");
     try {
+        const csrf = assertSameOrigin(request);
+        if (csrf) return csrf;
+
         const userId = await getUserId();
         if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401, headers: reqHeaders }
+            );
         }
+        const userLog = withUser(log, userId);
 
-        // Get user's schedule ID
         const supabase = createServerClient();
         const { data: user } = await supabase
             .from("users")
@@ -74,32 +101,41 @@ export async function DELETE(request: Request) {
             .single();
 
         if (!user?.schedule_id) {
-            return NextResponse.json({ error: "No schedule found" }, { status: 404 });
+            return NextResponse.json(
+                { error: "No schedule found" },
+                { status: 404, headers: reqHeaders }
+            );
         }
 
         const { deactivateUserSchedule } = await import("@/trigger/userSchedules");
         await deactivateUserSchedule(user.schedule_id);
 
-        return NextResponse.json({ success: true });
-    } catch (error) {
-        console.error("[Schedule API] Error:", error);
+        userLog.info({ scheduleId: user.schedule_id }, "schedule deactivated");
+        return NextResponse.json({ success: true }, { headers: reqHeaders });
+    } catch (err) {
+        log.error({ err }, "unexpected error in DELETE /api/schedule");
+        Sentry.captureException(err);
         return NextResponse.json(
-            { error: error instanceof Error ? error.message : "Failed to deactivate schedule" },
-            { status: 500 }
+            { error: err instanceof Error ? err.message : "Failed to deactivate schedule" },
+            { status: 500, headers: reqHeaders }
         );
     }
 }
 
 /**
  * GET /api/schedule
- * 
+ *
  * Get current user's schedule info
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const { log, headers: reqHeaders } = withRequestId(request, "GET /api/schedule");
     try {
         const userId = await getUserId();
         if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401, headers: reqHeaders }
+            );
         }
 
         const supabase = createServerClient();
@@ -110,7 +146,10 @@ export async function GET() {
             .single();
 
         if (!user) {
-            return NextResponse.json({ error: "User not found" }, { status: 404 });
+            return NextResponse.json(
+                { error: "User not found" },
+                { status: 404, headers: reqHeaders }
+            );
         }
 
         const cronDescriptions: Record<string, string> = {
@@ -119,16 +158,20 @@ export async function GET() {
             enterprise: "Every hour",
         };
 
-        return NextResponse.json({
-            scheduleId: user.schedule_id,
-            plan: user.plan_type || "free",
-            frequency: cronDescriptions[user.plan_type || "free"],
-        });
-    } catch (error) {
-        console.error("[Schedule API] Error:", error);
         return NextResponse.json(
-            { error: error instanceof Error ? error.message : "Failed to get schedule" },
-            { status: 500 }
+            {
+                scheduleId: user.schedule_id,
+                plan: user.plan_type || "free",
+                frequency: cronDescriptions[user.plan_type || "free"],
+            },
+            { headers: reqHeaders }
+        );
+    } catch (err) {
+        log.error({ err }, "unexpected error in GET /api/schedule");
+        Sentry.captureException(err);
+        return NextResponse.json(
+            { error: err instanceof Error ? err.message : "Failed to get schedule" },
+            { status: 500, headers: reqHeaders }
         );
     }
 }

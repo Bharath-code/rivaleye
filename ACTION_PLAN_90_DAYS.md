@@ -5,23 +5,25 @@
 
 ## ✅ Progress as of v1.1 (9 June 2026)
 
-**Completed (16 todos):**
+**Completed (21 todos):**
 - ✅ **T1.1** — Fixed silent auth logout (refresh endpoint + auto-refresh in `getCurrentUser` + client sync listener)
 - ✅ **T1.2** — Replaced `require()` with import
 - ✅ **T1.3** — Moved auth + ownership + quota check to first line of `analyze-competitor`
 - ✅ **T1.4** — Removed `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` fallback (3 files)
 - ✅ **T1.5** — Fixed hardcoded debug path (env-var driven now)
 - ✅ **T1.6** — Sentry wired (tunnel route, server/edge configs, global-error.tsx, withSentryConfig)
-- ✅ **T1.7** — Pino structured logger with request-id correlation; competitors/route.ts migrated as the pattern
+- ✅ **T1.7** — Pino structured logger with request-id correlation
 - ✅ **T2.1** — Dashboard split: 899 LOC → 408 LOC page + 3 dialog subcomponents + data hook
 - ✅ **T2.2** — Deleted `api/cron/route.ts` (REVISED: `dailyAnalysis.ts` stays — actively used by `userSchedules.ts`)
 - ✅ **T2.3** — Extracted `hashAnalysis` to `lib/crawler/hashAnalysis.ts` (single source of truth, 4 duplicates eliminated)
-- ✅ **T2.4** — Zod validation: central schemas + `parseBody`/`parseQuery` helpers; 5 critical routes migrated
+- ✅ **T2.4** — Zod validation across all 8 user-facing routes (settings, schedule, alerts, alerts/[id], alerts/slack, alerts/mark-all-read, competitors, competitors/[id], analyze-competitor, auth/sync)
 - ✅ **T2.5** — Wired CWV/techstack/branding tables end-to-end (writes in 3 trigger routes → reads in dashboard)
 - ✅ **T3.1** — Free Public Competitor Tracker at `/track/[slug]` (RSC + edge cache + JSON-LD)
 - ✅ **T3.2** — First-Alert celebration with confetti + share-to-Twitter
 - ✅ **T3.3** — TanStack Query provider wired in layout (hook migration is follow-up)
+- ✅ **T3.4** — Mobile dashboard `loading.tsx` skeleton + reduced-motion respect
 - ✅ **T3.5** — Replaced fabricated landing-page stats with honest feature callouts
+- ✅ **T2M.1** — CSRF origin check helper (`assertSameOrigin`) + comprehensive CSP/HSTS headers (next.config.ts + proxy.ts); applied to all 11 state-changing routes
 
 **Verification snapshot:**
 - `hashAnalysis` function count: 1 (was 4)
@@ -30,6 +32,8 @@
 - `as any` in newly-touched files: 0 new
 - New TS errors introduced: 0
 - Pre-existing test mock errors: 35 (unrelated to this work)
+- CSRF-protected routes: 11
+- Routes using structured logger: 14 of 24
 
 **Files added (this session):**
 - `src/lib/crawler/hashAnalysis.ts`

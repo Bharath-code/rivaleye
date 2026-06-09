@@ -7,6 +7,9 @@ import { getUserWithQuota, canManualCheck, incrementManualCheckCount } from "@/l
 import { detectManualSpam } from "@/lib/abuseDetection";
 import { checkRateLimit, RATE_LIMITS, rateLimitHeaders } from "@/lib/rateLimit";
 import { parseBody, analyzeCompetitorSchema } from "@/lib/validation/schemas";
+import { assertSameOrigin } from "@/lib/csrf";
+import { withRequestId, withUser } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * POST /api/analyze-competitor
@@ -28,7 +31,11 @@ import { parseBody, analyzeCompetitorSchema } from "@/lib/validation/schemas";
  * is to verify ownership BEFORE the quota check.
  */
 export async function POST(request: Request) {
+    const { log, headers: reqHeaders } = withRequestId(request, "POST /api/analyze-competitor");
     try {
+        const csrf = assertSameOrigin(request);
+        if (csrf) return csrf;
+
         // ── 1. Auth (must be first — don't burn budget on anon traffic) ──
         const userId = await getUserId();
         if (!userId) {

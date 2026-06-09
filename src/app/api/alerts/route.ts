@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { getUserId } from "@/lib/auth";
+import { withRequestId, withUser } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Alerts API
@@ -8,17 +10,20 @@ import { getUserId } from "@/lib/auth";
  * GET - List user's alerts
  */
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const { log, headers: reqHeaders } = withRequestId(request, "GET /api/alerts");
     try {
         const userId = await getUserId();
 
         if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401, headers: reqHeaders }
+            );
         }
 
         const supabase = createServerClient();
 
-        // Get alerts for user's competitors
         const { data: alerts, error } = await supabase
             .from("alerts")
             .select(`
@@ -35,13 +40,24 @@ export async function GET() {
             .limit(20);
 
         if (error) {
-            console.error("Error fetching alerts:", error);
-            return NextResponse.json({ error: "Failed to fetch alerts" }, { status: 500 });
+            withUser(log, userId).error({ err: error }, "failed to fetch alerts");
+            Sentry.captureException(error);
+            return NextResponse.json(
+                { error: "Failed to fetch alerts" },
+                { status: 500, headers: reqHeaders }
+            );
         }
 
-        return NextResponse.json({ alerts });
-    } catch (error) {
-        console.error("Unexpected error:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json(
+            { alerts },
+            { headers: reqHeaders }
+        );
+    } catch (err) {
+        log.error({ err }, "unexpected error in GET /api/alerts");
+        Sentry.captureException(err);
+        return NextResponse.json(
+            { error: "Internal server error" },
+            { status: 500, headers: reqHeaders }
+        );
     }
 }

@@ -7,6 +7,7 @@ import { validateCompetitorUrl } from "@/lib/urlValidator";
 import { getFeatureFlags } from "@/lib/billing/featureFlags";
 import { withRequestId, withUser } from "@/lib/logger";
 import { parseBody, parseQuery, createCompetitorSchema, queryIdSchema } from "@/lib/validation/schemas";
+import { assertSameOrigin } from "@/lib/csrf";
 import * as Sentry from "@sentry/nextjs";
 
 /**
@@ -108,6 +109,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     const { log, headers: reqHeaders } = withRequestId(request, "POST /api/competitors");
     try {
+        const csrf = assertSameOrigin(request);
+        if (csrf) return csrf;
+
         const userId = await getUserId();
         if (!userId) {
             log.warn("unauthorized POST /api/competitors");
@@ -237,6 +241,9 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
     const { log, headers: reqHeaders } = withRequestId(request, "DELETE /api/competitors");
     try {
+        const csrf = assertSameOrigin(request);
+        if (csrf) return csrf;
+
         const userId = await getUserId();
         if (!userId) {
             return NextResponse.json(

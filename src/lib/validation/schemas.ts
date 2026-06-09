@@ -78,29 +78,98 @@ export const authSyncSchema = z.object({
 // Settings
 // ══════════════════════════════════════════════════════════════════════════════
 
-export const updateSettingsSchema = z.object({
-    emailAlerts: z.boolean().optional(),
-    slackWebhookUrl: z.string().url().nullable().optional(),
-    timezone: z.string().optional(),
-});
+export const updateSettingsSchema = z
+    .object({
+        email_enabled: z.boolean().optional(),
+        digest_frequency: z.enum(["instant", "daily", "weekly"]).optional(),
+        // Accept empty string → null (we coerce later)
+        slack_webhook_url: z
+            .union([
+                z.literal(""),
+                z.string().url().refine(
+                    (url) => url.startsWith("https://hooks.slack.com/"),
+                    { message: "Must be a Slack webhook URL (https://hooks.slack.com/...)" }
+                ),
+                z.null(),
+            ])
+            .optional(),
+    })
+    .refine(
+        (data) =>
+            data.email_enabled !== undefined ||
+            data.digest_frequency !== undefined ||
+            data.slack_webhook_url !== undefined,
+        { message: "At least one field must be provided" }
+    );
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Schedule
 // ══════════════════════════════════════════════════════════════════════════════
 
-export const scheduleSchema = z.object({
-    cron: z.string().min(1).max(100).optional(),
-    timezone: z.string().min(1).max(100).optional(),
+export const createScheduleSchema = z.object({
+    plan: z.enum(["free", "pro", "enterprise"]).default("free"),
+    timezone: z.string().min(1).max(100).default("UTC"),
 });
+export type CreateScheduleInput = z.infer<typeof createScheduleSchema>;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Alerts
+// ══════════════════════════════════════════════════════════════════════════════
+
+export const updateAlertSchema = z
+    .object({
+        is_read: z.boolean().optional(),
+        is_dismissed: z.boolean().optional(),
+    })
+    .refine(
+        (data) => data.is_read !== undefined || data.is_dismissed !== undefined,
+        { message: "At least one of is_read or is_dismissed must be provided" }
+    );
+export type UpdateAlertInput = z.infer<typeof updateAlertSchema>;
+
+export const slackAlertSchema = z.union([
+    // Real send mode
+    z.object({ alertId: z.string().uuid() }),
+    // Test mode
+    z.object({
+        test: z.literal(true),
+        webhookUrl: z.string().url().refine(
+            (url) => url.startsWith("https://hooks.slack.com/"),
+            { message: "Must be a Slack webhook URL" }
+        ),
+    }),
+]);
+export type SlackAlertInput = z.infer<typeof slackAlertSchema>;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Market Radar
 // ══════════════════════════════════════════════════════════════════════════════
 
-export const marketRadarSchema = z.object({
-    // No body required; Pro check is done in handler
-}).optional();
+export const marketRadarSchema = z.object({}).optional();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CSRF
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Whitelist of origins allowed to make POST/PATCH/DELETE requests.
+ *
+ * Configured via NEXT_PUBLIC_APP_URL in env. In dev, allows localhost.
+ *
+ * Used by `assertSameOrigin()` in API routes to prevent CSRF:
+ *  curl -X POST /api/competitors -H "Origin: https://evil.com" → 403
+ */
+export function getAllowedOrigins(): string[] {
+    const origins: string[] = [];
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (appUrl) origins.push(appUrl);
+    if (process.env.NODE_ENV !== "production") {
+        origins.push("http://localhost:3000");
+        origins.push("http://127.0.0.1:3000");
+    }
+    return origins;
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Parsing helpers

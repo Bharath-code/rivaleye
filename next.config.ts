@@ -5,22 +5,50 @@ import { withSentryConfig } from "@sentry/nextjs";
  * Next.js config
  *
  * Wrapped with Sentry for automatic error capture and source-map upload.
- * - DSN: read from SENTRY_DSN env (no-op if unset — Sentry is opt-in)
- * - Tunnel route: /monitoring tunnels events to avoid ad-blocker blocking
- * - Source maps: uploaded at build time
- * - Sample rate: 100% in dev, 10% in prod (set in sentry.server.config.ts)
+ *
+ * Security headers (set globally on every response):
+ *  - Content-Security-Policy: strict default-src 'self', whitelists
+ *    Sentry, PostHog, Resend, Cloudflare, Dodo, Google Fonts
+ *  - X-Content-Type-Options: nosniff
+ *  - X-Frame-Options: DENY (anti-clickjacking)
+ *  - Referrer-Policy: strict-origin-when-cross-origin
+ *  - Permissions-Policy: camera/mic/geolocation off (not used by app)
+ *  - Strict-Transport-Security: HSTS enabled in prod (1-year, includeSubDomains)
  */
+
+const securityHeaders = [
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "X-Frame-Options", value: "DENY" },
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), interest-cohort=()" },
+    // CSP: strict default-src 'self' with explicit allowlists for known third-parties
+    {
+        key: "Content-Security-Policy",
+        value: [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.sentry.io https://*.cloudflareinsights.com",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "font-src 'self' https://fonts.gstatic.com data:",
+            "img-src 'self' data: blob: https:",
+            "connect-src 'self' https://*.supabase.co https://*.sentry.io https://us.i.posthog.com https://eu.i.posthog.com https://static.cloudflareinsights.com",
+            "frame-ancestors 'none'",
+            "form-action 'self'",
+            "base-uri 'self'",
+            "object-src 'none'",
+        ].join("; "),
+    },
+    // HSTS: only meaningful over HTTPS, so only set in prod
+    ...(process.env.NODE_ENV === "production"
+        ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" }]
+        : []),
+];
 
 const nextConfig: NextConfig = {
     async headers() {
         return [
             {
                 source: "/:path*",
-                headers: [
-                    { key: "X-Content-Type-Options", value: "nosniff" },
-                    { key: "X-Frame-Options", value: "DENY" },
-                    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-                ],
+                headers: securityHeaders,
             },
         ];
     },
