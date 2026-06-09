@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { analytics } from "@/components/providers/AnalyticsProvider";
+import { useRealtimeAlerts } from "@/hooks/useRealtimeAlerts";
 
 /**
  * useDashboardData — Centralized data hook for the dashboard.
@@ -162,6 +163,24 @@ export function useDashboardData(): DashboardData {
             return false;
         }
     })();
+
+    // Real-time: when a new alert is inserted (by the daily trigger
+    // job or a manual analysis), prepend it to the list without a refetch.
+    useRealtimeAlerts({
+        competitorIds: competitors.map((c) => c.id),
+        enabled: !isLoading && competitors.length > 0,
+        onNewAlert: useCallback(
+            (newAlert: Record<string, unknown>) => {
+                setAlerts((prev) => {
+                    // De-dupe by id in case of duplicate events
+                    if (prev.some((a) => a.id === newAlert.id)) return prev;
+                    // Cast through unknown — payload shape is loosely typed
+                    return [newAlert as unknown as DashboardAlert, ...prev].slice(0, 50);
+                });
+            },
+            []
+        ),
+    });
 
     return {
         competitors,

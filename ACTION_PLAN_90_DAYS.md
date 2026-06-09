@@ -5,7 +5,7 @@
 
 ## ✅ Progress as of v1.1 (9 June 2026)
 
-**Completed (21 todos):**
+**Completed (24 todos):**
 - ✅ **T1.1** — Fixed silent auth logout (refresh endpoint + auto-refresh in `getCurrentUser` + client sync listener)
 - ✅ **T1.2** — Replaced `require()` with import
 - ✅ **T1.3** — Moved auth + ownership + quota check to first line of `analyze-competitor`
@@ -24,6 +24,8 @@
 - ✅ **T3.4** — Mobile dashboard `loading.tsx` skeleton + reduced-motion respect
 - ✅ **T3.5** — Replaced fabricated landing-page stats with honest feature callouts
 - ✅ **T2M.1** — CSRF origin check helper (`assertSameOrigin`) + comprehensive CSP/HSTS headers (next.config.ts + proxy.ts); applied to all 11 state-changing routes
+- ✅ **T2M.4 (early)** — pgvector + RAG: embeddings generated on every analysis, `/api/search` semantic-search endpoint, dashboard "AI · RAG" search bar with % match scores, full setup guide in `docs/SETUP_RAG_REALTIME.md`
+- ✅ **Realtime wow** — Supabase Realtime subscription on `alerts` table wired via `useRealtimeAlerts` hook; new alerts appear in dashboard <100ms after insert (no refetch)
 
 **Verification snapshot:**
 - `hashAnalysis` function count: 1 (was 4)
@@ -34,6 +36,7 @@
 - Pre-existing test mock errors: 35 (unrelated to this work)
 - CSRF-protected routes: 11
 - Routes using structured logger: 14 of 24
+- RAG cost estimate: ~$9/month at 1K users
 
 **Files added (this session):**
 - `src/lib/crawler/hashAnalysis.ts`

@@ -167,6 +167,31 @@ export async function POST(request: Request) {
 
         await supabase.from("analyses").insert(analysisRecord);
 
+        // ── Embed for semantic search (fire-and-forget) ──
+        // Non-blocking: if OpenAI is down or slow, the alert still fires.
+        // The embedding is enhancement, not critical path.
+        // We need the new analysis_id — fetch it back since the insert
+        // above doesn't return it.
+        const { data: insertedAnalysis } = await supabase
+            .from("analyses")
+            .select("id")
+            .eq("competitor_id", competitorId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (insertedAnalysis?.id) {
+            const { embedAndStoreAnalysis } = await import("@/lib/ai/embeddings");
+            // Don't await — let it run in the background
+            void embedAndStoreAnalysis(
+                userId,
+                competitorId,
+                insertedAnalysis.id,
+                analysis.analysis,
+                competitor.name
+            );
+        }
+
         // ── Save to pricing_snapshots for Market Radar ──
         let contextId: string | null = null;
 

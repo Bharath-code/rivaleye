@@ -26,6 +26,7 @@ import { AddCompetitorDialog } from "./AddCompetitorDialog";
 import { EditCompetitorDialog } from "./EditCompetitorDialog";
 import { PricingHistoryDialog } from "./PricingHistoryDialog";
 import { FirstAlertCelebration } from "@/components/alerts/FirstAlertCelebration";
+import { SemanticSearchBar } from "@/components/dashboard/SemanticSearchBar";
 import type { AnalysisResult } from "@/components/dashboard/AnalysisResultModal";
 
 /**
@@ -322,6 +323,23 @@ export default function Dashboard() {
                     )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Semantic search — RAG-powered */}
+                        <div className="lg:col-span-3">
+                            <Card className="glass-card">
+                                <CardContent className="p-5">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Sparkles className="w-4 h-4 text-emerald-400" />
+                                        <h2 className="font-display text-lg">
+                                            Search your intelligence
+                                        </h2>
+                                        <span className="text-[10px] uppercase tracking-widest font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">
+                                            AI · RAG
+                                        </span>
+                                    </div>
+                                    <SemanticSearchBar />
+                                </CardContent>
+                            </Card>
+                        </div>
                         <div className="lg:col-span-1">
                             <h2 className="font-mono text-sm text-muted-foreground uppercase tracking-wider mb-4">
                                 Competitors ({data.competitors.length})
