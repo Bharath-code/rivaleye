@@ -4,6 +4,7 @@ import { getUserId } from "@/lib/auth";
 import { analyzeCompetitorTask } from "@/trigger/analyzeCompetitor";
 import { checkRateLimit, RATE_LIMITS, rateLimitHeaders } from "@/lib/rateLimit";
 import { validateCompetitorUrl } from "@/lib/urlValidator";
+import { getFeatureFlags } from "@/lib/billing/featureFlags";
 
 /**
  * Competitors API
@@ -145,7 +146,7 @@ export async function POST(request: NextRequest) {
             .eq("user_id", userId);
 
         const userPlan = (user?.plan || "free") as "free" | "pro" | "enterprise";
-        const flags = require("@/lib/billing/featureFlags").getFeatureFlags(userPlan);
+        const flags = getFeatureFlags(userPlan);
 
         if ((existingCount ?? 0) >= flags.maxCompetitors) {
             return NextResponse.json(

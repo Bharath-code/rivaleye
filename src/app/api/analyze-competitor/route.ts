@@ -11,7 +11,6 @@ import { checkRateLimit, RATE_LIMITS, rateLimitHeaders } from "@/lib/rateLimit";
  * Create a hash of the key analysis fields for change detection
  */
 function hashAnalysis(analysis: CompetitorAnalysis): string {
-    // Hash only the fields that matter for change detection
     const keyData = {
         pricing: analysis.pricing?.plans?.map(p => ({
             name: p.name,
@@ -32,16 +31,29 @@ function hashAnalysis(analysis: CompetitorAnalysis): string {
  *
  * Vision-based competitor analysis using Gemini.
  * This is the single entry point for manual scans (replaces deprecated /api/check-now).
- * Subject to quota limits and abuse detection.
+ *
+ * Guard order matters (cheap → expensive):
+ *   1. Auth check (cookie presence + JWT validation)        — ~5ms
+ *   2. Rate limit (in-memory sliding window)                 — ~1ms
+ *   3. Body validation (competitorId present)                — ~1ms
+ *   4. Ownership check (competitor belongs to user)         — ~50ms
+ *   5. Quota + abuse check                                   — ~100ms
+ *   6. Increment quota (atomic via RPC)                      — ~100ms
+ *   7. Vision capture + Gemini call                          — ~30s, expensive
+ *
+ * Without step 4, a user could trigger analysis on someone else's
+ * competitor id, burning the *target user's* quota budget. The fix
+ * is to verify ownership BEFORE the quota check.
  */
 export async function POST(request: Request) {
     try {
+        // ── 1. Auth (must be first — don't burn budget on anon traffic) ──
         const userId = await getUserId();
         if (!userId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // Rate limit (protects AI/crawl budget)
+        // ── 2. Rate limit ──
         const rateCheck = checkRateLimit(`analysis:${userId}`, RATE_LIMITS.analysis);
         if (!rateCheck.allowed) {
             return NextResponse.json(
@@ -56,10 +68,11 @@ export async function POST(request: Request) {
             );
         }
 
+        // ── 3. Body validation ──
         const body = await request.json();
         const { competitorId } = body;
 
-        if (!competitorId) {
+        if (!competitorId || typeof competitorId !== "string") {
             return NextResponse.json(
                 { error: "competitorId is required" },
                 { status: 400 }
@@ -68,40 +81,10 @@ export async function POST(request: Request) {
 
         const supabase = createServerClient();
 
-        // ── Quota & Abuse Checks ─────────────────────────────────────────────────
-        const user = await getUserWithQuota(supabase, userId);
-        if (!user) {
-            return NextResponse.json({ error: "User not found" }, { status: 404 });
-        }
-
-        // Check abuse patterns
-        const abuseCheck = await detectManualSpam(supabase, userId);
-        if (abuseCheck.flagged) {
-            return NextResponse.json(
-                { error: abuseCheck.message },
-                { status: 429 }
-            );
-        }
-
-        // Check quota
-        const quotaCheck = canManualCheck(user);
-        if (!quotaCheck.allowed) {
-            return NextResponse.json(
-                {
-                    error: quotaCheck.reason,
-                    upgradePrompt: quotaCheck.upgradePrompt,
-                },
-                { status: 429 }
-            );
-        }
-
-        // Increment quota before analysis
-        await incrementManualCheckCount(supabase, userId);
-
-        // ── Get Competitor ───────────────────────────────────────────────────────
+        // ── 4. Ownership check (BEFORE quota — prevent quota drain attack) ──
         const { data: competitor, error: fetchError } = await supabase
             .from("competitors")
-            .select("*")
+            .select("id, user_id, url, name, status, failure_count")
             .eq("id", competitorId)
             .eq("user_id", userId)
             .single();
@@ -113,7 +96,42 @@ export async function POST(request: Request) {
             );
         }
 
-        // Get previous analysis for comparison
+        if (competitor.status === "paused") {
+            return NextResponse.json(
+                { error: "This competitor is paused due to repeated failures. Check the URL and try again." },
+                { status: 403 }
+            );
+        }
+
+        // ── 5. Quota & abuse checks (now safe — we know it's the user's competitor) ──
+        const user = await getUserWithQuota(supabase, userId);
+        if (!user) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 });
+        }
+
+        const abuseCheck = await detectManualSpam(supabase, userId);
+        if (abuseCheck.flagged) {
+            return NextResponse.json(
+                { error: abuseCheck.message },
+                { status: 429 }
+            );
+        }
+
+        const quotaCheck = canManualCheck(user);
+        if (!quotaCheck.allowed) {
+            return NextResponse.json(
+                {
+                    error: quotaCheck.reason,
+                    upgradePrompt: quotaCheck.upgradePrompt,
+                },
+                { status: 429 }
+            );
+        }
+
+        // ── 6. Increment quota (atomic RPC) before the expensive call ──
+        await incrementManualCheckCount(supabase, userId);
+
+        // ── 7. Get previous analysis for comparison ──
         const { data: previousAnalyses } = await supabase
             .from("analyses")
             .select("*")
@@ -125,7 +143,7 @@ export async function POST(request: Request) {
 
         console.log(`[Vision] Analyzing: ${competitor.url}`);
 
-        // Capture screenshot and analyze with Gemini
+        // ── 8. Vision capture + Gemini (expensive) ──
         const { screenshot, analysis } = await captureAndAnalyze(competitor.url);
 
         if (!analysis.success) {
@@ -158,17 +176,15 @@ export async function POST(request: Request) {
             analysis_hash: currentHash,
             raw_analysis: analysis.rawAnalysis,
             screenshot_size: analysis.screenshotSize,
-            screenshot_path: screenshotPath, // Store the R2 path
+            screenshot_path: screenshotPath,
             model: analysis.model,
             has_changes: hasChanged,
             created_at: analysis.timestamp,
         };
 
-        // Insert into analyses table
         await supabase.from("analyses").insert(analysisRecord);
 
-        // ── Save to pricing_snapshots for Market Radar ───────────────────────────
-        // Get or create the global pricing context (shared across all competitors)
+        // ── Save to pricing_snapshots for Market Radar ──
         let contextId: string | null = null;
 
         const { data: existingContext } = await supabase
@@ -180,7 +196,6 @@ export async function POST(request: Request) {
         if (existingContext) {
             contextId = existingContext.id;
         } else {
-            // Create default global context if it doesn't exist
             const { data: newContext } = await supabase
                 .from("pricing_contexts")
                 .insert({
@@ -197,7 +212,6 @@ export async function POST(request: Request) {
             contextId = newContext?.id || null;
         }
 
-        // Save pricing snapshot if context exists and we have pricing data
         if (contextId && analysis.analysis.pricing?.plans?.length > 0) {
             const pricingSchema = {
                 currency: analysis.analysis.pricing?.currency || "USD",
@@ -255,19 +269,21 @@ export async function POST(request: Request) {
             });
         }
 
-        // Save screenshot to disk for debugging (development only)
+        // Save screenshot to disk for debugging (development only, parametrized path)
         if (screenshot && process.env.NODE_ENV === "development") {
+            const debugDir = process.env.DEBUG_SCREENSHOT_DIR ||
+                `${process.cwd()}/.debug/rivaleye`;
             const fs = await import("fs/promises");
-            const debugDir = "/Users/bharath/Desktop/SaaS_projects/rivaleye/debug";
+            const path = await import("path");
             await fs.mkdir(debugDir, { recursive: true });
 
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
             await fs.writeFile(
-                `${debugDir}/screenshot_${timestamp}.png`,
+                path.join(debugDir, `screenshot_${timestamp}.png`),
                 screenshot
             );
             await fs.writeFile(
-                `${debugDir}/analysis_${timestamp}.json`,
+                path.join(debugDir, `analysis_${timestamp}.json`),
                 JSON.stringify(analysis.analysis, null, 2)
             );
             console.log(`[Vision] Saved debug files to ${debugDir}`);
@@ -290,7 +306,6 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error("[Vision API] Error:", error);
 
-        // Specific handling for Gemini Rate Limits (429)
         const errorMessage = error instanceof Error ? error.message : String(error);
         if (errorMessage.includes("429") || errorMessage.includes("quota")) {
             return NextResponse.json(
@@ -324,7 +339,6 @@ function detectSpecificChanges(
     const changes: string[] = [];
     let hasPricingChange = false;
 
-    // Check pricing changes
     const prevPrices = previous.pricing?.plans?.map(p => `${p.name}:${p.price}`) || [];
     const currPrices = current.pricing?.plans?.map(p => `${p.name}:${p.price}`) || [];
 
@@ -334,7 +348,6 @@ function detectSpecificChanges(
         hasPricingChange = true;
     }
 
-    // Check new plans added
     const prevPlanNames = previous.pricing?.plans?.map(p => p.name) || [];
     const currPlanNames = current.pricing?.plans?.map(p => p.name) || [];
     const newPlans = currPlanNames.filter(n => !prevPlanNames.includes(n));
@@ -342,7 +355,6 @@ function detectSpecificChanges(
         changes.push(`New plans: ${newPlans.join(", ")}`);
     }
 
-    // Check feature changes
     const prevFeatures = previous.features?.highlighted || [];
     const currFeatures = current.features?.highlighted || [];
     const newFeatures = currFeatures.filter(f => !prevFeatures.includes(f));
@@ -350,7 +362,6 @@ function detectSpecificChanges(
         changes.push(`New features: ${newFeatures.slice(0, 3).join(", ")}`);
     }
 
-    // Check positioning changes
     if (previous.positioning?.valueProposition !== current.positioning?.valueProposition) {
         changes.push("Value proposition updated");
     }
@@ -368,4 +379,3 @@ function detectSpecificChanges(
         hasPricingChange,
     };
 }
-

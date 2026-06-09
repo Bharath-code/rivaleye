@@ -21,11 +21,14 @@ export async function POST(request: NextRequest) {
         // Set cookies for session persistence
         const cookieStore = await cookies();
 
+        // Cookie TTLs:
+        // - access token: 1h (matches Supabase JWT expiry)
+        // - refresh token: 30d (used to mint new access tokens via /api/auth/refresh)
         cookieStore.set("sb-access-token", accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
-            maxAge: 60 * 60 * 24 * 7, // 7 days
+            maxAge: 60 * 60, // 1 hour
             path: "/",
         });
 
@@ -39,12 +42,13 @@ export async function POST(request: NextRequest) {
 
         // Verify tokens and get user
         const { createClient } = await import("@supabase/supabase-js");
-        const anonKey =
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
         if (!anonKey) {
-            return NextResponse.json({ error: "Supabase anon key is not configured" }, { status: 500 });
+            return NextResponse.json(
+                { error: "NEXT_PUBLIC_SUPABASE_ANON_KEY is not configured" },
+                { status: 500 }
+            );
         }
 
         const supabase = createClient(

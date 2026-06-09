@@ -6,18 +6,31 @@ import type { User } from "@/lib/types";
  * Auth Helper
  *
  * Provides utilities for authentication in server components and API routes.
+ *
+ * Token strategy:
+ * - sb-access-token: 1h (Supabase JWT expiry)
+ * - sb-refresh-token: 30d (used by /api/auth/refresh to mint new access tokens)
+ *
+ * When the access token expires, getCurrentUser() automatically calls
+ * supabase.auth.refreshSession() with the refresh token and rotates both
+ * cookies. This prevents the "silent 1-hour logout" bug where users got
+ * booted after 1h of use.
  */
 
 /**
- * Create a Supabase client for server-side auth operations
+ * Create a Supabase client for server-side auth operations.
+ *
+ * Throws at boot if the env var is missing — no silent fallback to
+ * NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY (which nobody configures).
  */
 export function createAuthClient() {
-    const anonKey =
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!anonKey) {
-        throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable");
+        throw new Error(
+            "FATAL: NEXT_PUBLIC_SUPABASE_ANON_KEY is required. " +
+            "Set it in .env.local or your deployment environment."
+        );
     }
 
     return createClient(
@@ -33,25 +46,101 @@ export function createAuthClient() {
 }
 
 /**
- * Get the current authenticated user from the session
- * Returns null if not authenticated
+ * Refresh the access token using the refresh token from cookies.
+ * Returns the new access token on success, null on failure.
+ * Side effect: writes new cookies via the Next.js cookies() API.
+ */
+async function refreshAccessToken(): Promise<string | null> {
+    try {
+        const cookieStore = await cookies();
+        const refreshToken = cookieStore.get("sb-refresh-token")?.value;
+
+        if (!refreshToken) return null;
+
+        const supabase = createAuthClient();
+        const { data, error } = await supabase.auth.refreshSession({
+            refresh_token: refreshToken,
+        });
+
+        if (error || !data.session) {
+            // Refresh token is invalid/expired — clear cookies so the next
+            // request goes through proxy.ts and gets redirected to /login
+            cookieStore.delete("sb-access-token");
+            cookieStore.delete("sb-refresh-token");
+            return null;
+        }
+
+        cookieStore.set("sb-access-token", data.session.access_token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            maxAge: 60 * 60, // 1 hour
+            path: "/",
+        });
+
+        if (data.session.refresh_token) {
+            cookieStore.set("sb-refresh-token", data.session.refresh_token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                maxAge: 60 * 60 * 24 * 30, // 30 days
+                path: "/",
+            });
+        }
+
+        return data.session.access_token;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Get the current authenticated user from the session.
+ * Returns null if not authenticated.
+ *
+ * If the access token is expired, automatically attempts one refresh
+ * before giving up. This is the fix for the silent-logout-after-1h bug.
  */
 export async function getCurrentUser(): Promise<User | null> {
     try {
         const cookieStore = await cookies();
-        const accessToken = cookieStore.get("sb-access-token")?.value;
+        let accessToken = cookieStore.get("sb-access-token")?.value;
         const refreshToken = cookieStore.get("sb-refresh-token")?.value;
 
-        if (!accessToken || !refreshToken) {
+        if (!accessToken && !refreshToken) {
             return null;
         }
 
         const supabase = createAuthClient();
 
-        const {
+        // If no access token, try refreshing first
+        if (!accessToken && refreshToken) {
+            const refreshed = await refreshAccessToken();
+            if (!refreshed) return null;
+            accessToken = refreshed;
+        }
+
+        let {
             data: { user: authUser },
             error,
-        } = await supabase.auth.getUser(accessToken);
+        } = await supabase.auth.getUser(accessToken!);
+
+        // Access token expired → try refreshing once
+        if (error && refreshToken) {
+            const isExpired =
+                error.message?.toLowerCase().includes("expired") ||
+                error.message?.toLowerCase().includes("invalid") ||
+                error.status === 401;
+
+            if (isExpired) {
+                const newToken = await refreshAccessToken();
+                if (newToken) {
+                    const retry = await supabase.auth.getUser(newToken);
+                    authUser = retry.data.user;
+                    error = retry.error;
+                }
+            }
+        }
 
         if (error || !authUser) {
             return null;
@@ -87,32 +176,41 @@ export async function getCurrentUser(): Promise<User | null> {
 }
 
 /**
- * Check if user is authenticated (lightweight check)
+ * Check if user is authenticated (lightweight check, no DB)
  */
 export async function isAuthenticated(): Promise<boolean> {
     const cookieStore = await cookies();
-    const accessToken = cookieStore.get("sb-access-token")?.value;
-    return !!accessToken;
+    return !!cookieStore.get("sb-access-token")?.value;
 }
 
 /**
- * Get user ID from session (fast, doesn't hit DB)
+ * Get user ID from session (fast, doesn't hit DB).
+ * Returns null if no valid session.
  */
 export async function getUserId(): Promise<string | null> {
     try {
         const cookieStore = await cookies();
-        const accessToken = cookieStore.get("sb-access-token")?.value;
+        let accessToken = cookieStore.get("sb-access-token")?.value;
+        const refreshToken = cookieStore.get("sb-refresh-token")?.value;
 
-        if (!accessToken) {
-            return null;
-        }
+        if (!accessToken && !refreshToken) return null;
 
         const supabase = createAuthClient();
+
+        if (!accessToken && refreshToken) {
+            const refreshed = await refreshAccessToken();
+            if (!refreshed) return null;
+            accessToken = refreshed;
+        }
+
         const {
             data: { user },
-        } = await supabase.auth.getUser(accessToken);
+            error,
+        } = await supabase.auth.getUser(accessToken!);
 
-        return user?.id || null;
+        if (error || !user) return null;
+
+        return user.id;
     } catch {
         return null;
     }
