@@ -23,6 +23,7 @@ import {
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import { cn } from "@/lib/utils";
+import { AEOVisibilityCard } from "@/components/dashboard/AEOVisibilityCard";
 
 interface CompetitorDetails {
     competitor: {
@@ -392,6 +393,21 @@ export default function CompetitorDetailPage() {
                                 )}
                             </CardContent>
                         </Card>
+                    </div>
+
+                    {/* AEO (Answer Engine Optimization) — Full-width row */}
+                    <div className="mt-6">
+                        <div className="flex items-center gap-2 mb-3">
+                            <h2 className="font-display text-xl">AI Visibility</h2>
+                            <span className="text-[10px] uppercase tracking-widest font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">
+                                AEO
+                            </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                            How often this competitor is mentioned in answers from
+                            ChatGPT, Perplexity, Claude, Gemini, and Google AI.
+                        </p>
+                        <AEOVisibilityCard competitor={data.competitor} />
                     </div>
 
                     {/* Key Insights */}

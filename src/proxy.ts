@@ -30,6 +30,7 @@ const PUBLIC_API_ROUTES = new Set([
     // Note: /api/cron removed — handler deleted, no callers. Daily jobs
     // run via Trigger.dev schedules (src/trigger/dailyAnalysis.ts,
     // src/trigger/dailyPricingAnalysis.ts), not via Next API routes.
+    // AEO routes require auth — handled inside each route via getUserId()
 ]);
 
 function isPublicRoute(pathname: string): boolean {

@@ -104,8 +104,9 @@ export default function Home() {
 
           {/* Subheadline */}
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed gsap-reveal">
-            RivalEye monitors competitor pricing, tech stack, and branding across 4 global regions.
-            When they move, you get an <span className="text-foreground font-medium">AI tactical brief</span> — not just a notification.
+            RivalEye monitors competitor pricing, tech stack, and branding across 4 global regions —
+            AND tracks when AI assistants recommend them. When they move, you get an
+            <span className="text-foreground font-medium"> AI tactical brief</span> — not just a notification.
           </p>
 
           {/* CTAs */}
@@ -468,6 +469,7 @@ export default function Home() {
                   { text: "Daily + on-demand scans", highlight: false },
                   { text: "4 regional pricing sensors (US, EU, IN, Global)", highlight: true },
                   { text: "AI tactical briefs for every change", highlight: true },
+                  { text: "AEO Monitor — track ChatGPT, Perplexity, Claude visibility", highlight: true },
                   { text: "Tech Stack & Branding alerts", highlight: true },
                   { text: "Core Web Vitals monitoring", highlight: true },
                   { text: "Slack + Email alerts", highlight: true },

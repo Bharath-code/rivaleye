@@ -5,7 +5,7 @@
 
 ## ✅ Progress as of v1.1 (9 June 2026)
 
-**Completed (26 todos):**
+**Completed (27 todos):**
 - ✅ **T1.1** — Fixed silent auth logout (refresh endpoint + auto-refresh in `getCurrentUser` + client sync listener)
 - ✅ **T1.2** — Replaced `require()` with import
 - ✅ **T1.3** — Moved auth + ownership + quota check to first line of `analyze-competitor`
@@ -28,6 +28,7 @@
 - ✅ **Realtime wow** — Supabase Realtime subscription on `alerts` table wired via `useRealtimeAlerts` hook; new alerts appear in dashboard <100ms after insert (no refetch)
 - ✅ **T4.1** — Programmatic SEO: 30 pages shipped (10 `/vs/[competitor]`, 5 `/for/[industry]`, 15 `/track/[competitor]/[region]`) + dynamic sitemap.xml + robots.txt + setup guide for 5 aged domains in `docs/SETUP_SEO_DOMAINS.md`
 - ✅ **T2M.2** — CI/CD: 4-gate pipeline (lint + typecheck + test + build) in `.github/workflows/test.yml`; deploy gated on test success via `workflow_run`; PR template + branch protection guide in `docs/CI_SETUP.md`; 565 tests passing; 70/70 pages building successfully
+- ✅ **T4.2** — AEO Monitor (Answer Engine Optimization): 5-provider abstraction (ChatGPT/Perplexity/Claude/Gemini/Google AI), query generator, mention parser with citation matching, daily Trigger.dev cron, change-detector with alerts, dashboard card with per-model bars + 30-day trend, full RLS + 3 RPC functions, hero copy + Pro tier feature added. **Klue, Crayon, and Visualping cannot replicate this without rebuilding their stack.**
 
 **Verification snapshot:**
 - `hashAnalysis` function count: 1 (was 4)
