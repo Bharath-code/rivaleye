@@ -69,7 +69,7 @@ export default function AlertDetailPage() {
 
             // Transform data
             const alertData = data.alert;
-            let parsedDetails = alertData.details || {};
+            const parsedDetails = alertData.details || {};
 
             // Try to parse ai_insight for extra context (insights/playbooks)
             if (alertData.ai_insight) {

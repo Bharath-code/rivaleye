@@ -1,21 +1,33 @@
 name: Deploy RivalEye Stack
 
+# Triggered by the CI workflow completing successfully on main.
+# This decouples deploy from test — they share no code paths.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "workers/**"
-      - "src/trigger/**"
-      - ".github/workflows/deploy.yml"
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Force deploy (bypasses test gate — use with caution)"
+        type: boolean
+        default: false
+
+# Don't deploy twice for the same commit
+concurrency:
+  group: deploy-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   deploy-cloudflare:
-    name: Deploy Analytics Proxy (Cloudflare)
+    name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'workflow_dispatch' && inputs.force) ||
+      (github.event.workflow_run.conclusion == 'success')
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
@@ -24,20 +36,20 @@ jobs:
           workingDirectory: "workers/analytics-proxy"
 
   deploy-trigger:
-    name: Deploy Tasks (Trigger.dev)
+    name: Deploy Trigger.dev Tasks
     runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'workflow_dispatch' && inputs.force) ||
+      (github.event.workflow_run.conclusion == 'success')
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
+          cache: npm
 
-      - name: Install dependencies
-        run: npm install
+      - run: npm ci
 
       - name: Deploy to Trigger.dev
         run: npx trigger.dev@latest deploy --prod

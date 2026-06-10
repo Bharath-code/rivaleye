@@ -5,7 +5,7 @@
 
 ## ✅ Progress as of v1.1 (9 June 2026)
 
-**Completed (25 todos):**
+**Completed (26 todos):**
 - ✅ **T1.1** — Fixed silent auth logout (refresh endpoint + auto-refresh in `getCurrentUser` + client sync listener)
 - ✅ **T1.2** — Replaced `require()` with import
 - ✅ **T1.3** — Moved auth + ownership + quota check to first line of `analyze-competitor`
@@ -27,6 +27,7 @@
 - ✅ **T2M.4 (early)** — pgvector + RAG: embeddings generated on every analysis, `/api/search` semantic-search endpoint, dashboard "AI · RAG" search bar with % match scores, full setup guide in `docs/SETUP_RAG_REALTIME.md`
 - ✅ **Realtime wow** — Supabase Realtime subscription on `alerts` table wired via `useRealtimeAlerts` hook; new alerts appear in dashboard <100ms after insert (no refetch)
 - ✅ **T4.1** — Programmatic SEO: 30 pages shipped (10 `/vs/[competitor]`, 5 `/for/[industry]`, 15 `/track/[competitor]/[region]`) + dynamic sitemap.xml + robots.txt + setup guide for 5 aged domains in `docs/SETUP_SEO_DOMAINS.md`
+- ✅ **T2M.2** — CI/CD: 4-gate pipeline (lint + typecheck + test + build) in `.github/workflows/test.yml`; deploy gated on test success via `workflow_run`; PR template + branch protection guide in `docs/CI_SETUP.md`; 565 tests passing; 70/70 pages building successfully
 
 **Verification snapshot:**
 - `hashAnalysis` function count: 1 (was 4)

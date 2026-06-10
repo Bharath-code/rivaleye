@@ -52,6 +52,16 @@ const nextConfig: NextConfig = {
             },
         ];
     },
+    // Native Node.js packages that should NOT be bundled by Turbopack.
+    // Bundling pino/thread-stream causes Turbopack to walk into their
+    // test fixtures and fail. Marking them serverExternal keeps them
+    // required at runtime in the node_modules tree.
+    serverExternalPackages: [
+        "pino",
+        "thread-stream",
+        "playwright",
+        "@sparticuz/chromium",
+    ],
 };
 
 export default withSentryConfig(nextConfig, {

@@ -17,7 +17,7 @@ export async function pushToSlack(payload: {
     webhookUrl?: string; // Custom webhook URL (per-user, may be encrypted)
 }) {
     // Decrypt webhook URL if it's encrypted
-    let webhookUrl = payload.webhookUrl
+    const webhookUrl = payload.webhookUrl
         ? decryptWebhookUrl(payload.webhookUrl)
         : process.env.SLACK_WEBHOOK_URL;
 
