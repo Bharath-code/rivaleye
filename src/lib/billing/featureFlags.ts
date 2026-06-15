@@ -6,6 +6,26 @@
 
 export type UserPlan = "free" | "pro" | "enterprise";
 
+/**
+ * Canonical pricing — the SINGLE SOURCE OF TRUTH for displayed plan prices.
+ *
+ * Marketing copy (landing, README) and any pricing UI must reference these
+ * values, not hardcode their own. Amounts are USD. `promoMonthly` is the
+ * current launch promotion; set to null to show the regular price only.
+ *
+ * NOTE: the Dodo `product_id` that actually charges the card is configured
+ * in the Dodo dashboard / env, not here. Keep them in sync with `proMonthly`.
+ */
+export const PLAN_PRICING: Record<UserPlan, {
+    monthly: number;
+    promoMonthly: number | null;
+    annual: number | null;
+}> = {
+    free: { monthly: 0, promoMonthly: null, annual: null },
+    pro: { monthly: 49, promoMonthly: 39, annual: 468 },
+    enterprise: { monthly: 0, promoMonthly: null, annual: null }, // "Contact us"
+};
+
 export interface FeatureFlags {
     maxCompetitors: number;
     maxPagesPerCompetitor: number;

@@ -67,8 +67,10 @@ export async function runAEOScan(
         throw new Error("AEO monitoring is disabled for this competitor");
     }
 
-    // 2. Determine queries
-    const queries =
+    // 2. Determine queries (capped — PERF-3: a custom 20-query set × 5 models
+    // would otherwise be 100 paid calls fired at once).
+    const MAX_QUERIES = Number(process.env.AEO_MAX_QUERIES_PER_SCAN ?? 10);
+    const rawQueries =
         options.queries ??
         (Array.isArray(competitor.aeo_queries) && competitor.aeo_queries.length > 0
             ? competitor.aeo_queries
@@ -76,6 +78,7 @@ export async function runAEOScan(
                   name: competitor.name,
                   url: competitor.url,
               }));
+    const queries = rawQueries.slice(0, MAX_QUERIES);
 
     // 3. Determine models — default to all 5
     const models: ModelName[] =
@@ -86,29 +89,64 @@ export async function runAEOScan(
         "AEO scan starting"
     );
 
-    // 4. Run queries in parallel (5 models × N queries)
-    const tasks: Array<{
-        model: ModelName;
-        query: string;
-        promise: Promise<{ response: AEOResponse | null; latency: number }>;
-    }> = [];
+    // 4. Run queries with bounded concurrency + a per-scan cost ceiling (PERF-3).
+    // Once cumulative spend reaches the ceiling, remaining calls are skipped
+    // rather than fired, so a single scan can never silently 100× the budget.
+    const CONCURRENCY = Number(process.env.AEO_SCAN_CONCURRENCY ?? 8);
+    const COST_CEILING = Number(process.env.AEO_SCAN_COST_CEILING_USD ?? 0.5);
 
+    const tasks: Array<{ model: ModelName; query: string }> = [];
     for (const query of queries) {
         for (const model of models) {
-            const task = (async () => {
-                const t0 = Date.now();
+            tasks.push({ model, query });
+        }
+    }
+
+    type Outcome = { response: AEOResponse | null; latency: number };
+    const results: Array<PromiseSettledResult<Outcome>> = new Array(tasks.length);
+    let runningCost = 0;
+    let ceilingHit = false;
+    let cursor = 0;
+
+    const worker = async (): Promise<void> => {
+        while (true) {
+            const i = cursor++;
+            if (i >= tasks.length) return;
+
+            if (ceilingHit || runningCost >= COST_CEILING) {
+                ceilingHit = true;
+                results[i] = {
+                    status: "rejected",
+                    reason: new Error("AEO cost ceiling reached"),
+                };
+                continue;
+            }
+
+            const { model, query } = tasks[i];
+            const t0 = Date.now();
+            try {
                 const response = await queryModel(model, {
                     prompt: query,
                     competitorName: competitor.name,
                 });
-                return { response, latency: Date.now() - t0 };
-            })();
-            tasks.push({ model, query, promise: task });
+                runningCost += response?.cost_usd ?? 0;
+                results[i] = { status: "fulfilled", value: { response, latency: Date.now() - t0 } };
+            } catch (err) {
+                results[i] = { status: "rejected", reason: err };
+            }
         }
-    }
+    };
 
-    // Wait for all
-    const results = await Promise.allSettled(tasks.map((t) => t.promise));
+    await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, () => worker())
+    );
+
+    if (ceilingHit) {
+        logger.warn(
+            { competitorId, runningCost, ceiling: COST_CEILING },
+            "AEO scan hit cost ceiling — remaining queries skipped"
+        );
+    }
 
     // 5. Parse + persist
     const rows: Array<{

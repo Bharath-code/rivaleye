@@ -108,6 +108,21 @@ describe('alertRules', () => {
             const decision = shouldTriggerAlert(freeTierRemoved)
             expect(decision.priority).toBeGreaterThanOrEqual(8)
         })
+
+        it('assigns distinct priorities to the top event types (CALC-4)', () => {
+            const p = (type: DetectedDiff['type'], severity: number) =>
+                shouldTriggerAlert(createMockDiff({ type, severity })).priority
+
+            const freeTier = p('free_tier_removed', 1.0)
+            const planRemoved = p('plan_removed', 0.95)
+            const priceUp = p('price_increase', 0.9)
+
+            // Old 1-10 integer scale collapsed all three to 10; the 0-100 scale
+            // keeps them strictly ordered and distinct.
+            expect(freeTier).toBeGreaterThan(planRemoved)
+            expect(planRemoved).toBeGreaterThan(priceUp)
+            expect(new Set([freeTier, planRemoved, priceUp]).size).toBe(3)
+        })
     })
 
     describe('filterAlertableDiffs', () => {

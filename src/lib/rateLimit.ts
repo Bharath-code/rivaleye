@@ -1,37 +1,23 @@
+import { Redis } from "@upstash/redis";
+import { Ratelimit } from "@upstash/ratelimit";
+
 /**
- * In-Memory Rate Limiter
+ * Distributed Rate Limiter (SEC-5)
  *
  * Sliding-window rate limiter for API routes.
- * Uses in-memory Map — resets on server restart, which is fine
- * for protecting AI/crawl budget during normal operation.
  *
- * For production scale, swap to Upstash Redis rate limiter.
+ * - When UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN are set, state lives
+ *   in Upstash Redis and the limit is enforced ATOMICALLY (Lua-backed sliding
+ *   window via @upstash/ratelimit) consistently across all serverless
+ *   instances. Atomicity matters: a naive read-count-then-write has a race
+ *   where concurrent requests all pass the check before any increments.
+ * - Otherwise it falls back to an in-memory Map (per-instance, best-effort) —
+ *   fine for local dev, but NOT effective on serverless. Set the env vars in
+ *   production.
+ *
+ * `checkRateLimit` is async (Redis is a network call). The in-memory path
+ * resolves synchronously under the hood.
  */
-
-interface RateLimitEntry {
-    timestamps: number[];
-}
-
-const rateLimitStore = new Map<string, RateLimitEntry>();
-
-// Cleanup stale entries every 5 minutes
-const CLEANUP_INTERVAL = 5 * 60 * 1000;
-let lastCleanup = Date.now();
-
-function cleanup(windowMs: number): void {
-    const now = Date.now();
-    if (now - lastCleanup < CLEANUP_INTERVAL) return;
-
-    lastCleanup = now;
-    const cutoff = now - windowMs;
-
-    for (const [key, entry] of rateLimitStore) {
-        entry.timestamps = entry.timestamps.filter((t) => t > cutoff);
-        if (entry.timestamps.length === 0) {
-            rateLimitStore.delete(key);
-        }
-    }
-}
 
 export interface RateLimitConfig {
     /** Max requests allowed in the window */
@@ -46,20 +32,57 @@ export interface RateLimitResult {
     resetMs: number;
 }
 
-/**
- * Check if a request is allowed under rate limiting.
- *
- * @param key - Unique identifier (userId, IP, etc.)
- * @param config - Rate limit configuration
- * @returns Whether the request is allowed + metadata
- */
-export function checkRateLimit(
-    key: string,
-    config: RateLimitConfig
-): RateLimitResult {
+// ══════════════════════════════════════════════════════════════════════════════
+// REDIS CLIENT (lazy, optional)
+// ══════════════════════════════════════════════════════════════════════════════
+
+let redis: Redis | null = null;
+let redisChecked = false;
+
+function getRedis(): Redis | null {
+    if (redisChecked) return redis;
+    redisChecked = true;
+
+    const url = process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (url && token) {
+        redis = new Redis({ url, token });
+    } else if (process.env.NODE_ENV === "production") {
+        console.warn(
+            "Upstash Redis env not set — rate limiting falls back to in-memory " +
+            "(per-instance, ineffective on serverless). Set UPSTASH_REDIS_REST_URL " +
+            "and UPSTASH_REDIS_REST_TOKEN."
+        );
+    }
+    return redis;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IN-MEMORY FALLBACK
+// ══════════════════════════════════════════════════════════════════════════════
+
+interface RateLimitEntry {
+    timestamps: number[];
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+const CLEANUP_INTERVAL = 5 * 60 * 1000;
+let lastCleanup = Date.now();
+
+function cleanup(windowMs: number): void {
+    const now = Date.now();
+    if (now - lastCleanup < CLEANUP_INTERVAL) return;
+    lastCleanup = now;
+    const cutoff = now - windowMs;
+    for (const [key, entry] of rateLimitStore) {
+        entry.timestamps = entry.timestamps.filter((t) => t > cutoff);
+        if (entry.timestamps.length === 0) rateLimitStore.delete(key);
+    }
+}
+
+function checkInMemory(key: string, config: RateLimitConfig): RateLimitResult {
     const now = Date.now();
     const cutoff = now - config.windowMs;
-
     cleanup(config.windowMs);
 
     let entry = rateLimitStore.get(key);
@@ -67,8 +90,6 @@ export function checkRateLimit(
         entry = { timestamps: [] };
         rateLimitStore.set(key, entry);
     }
-
-    // Remove timestamps outside the window
     entry.timestamps = entry.timestamps.filter((t) => t > cutoff);
 
     if (entry.timestamps.length >= config.maxRequests) {
@@ -81,12 +102,77 @@ export function checkRateLimit(
     }
 
     entry.timestamps.push(now);
-
     return {
         allowed: true,
         remaining: config.maxRequests - entry.timestamps.length,
         resetMs: config.windowMs,
     };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REDIS SLIDING WINDOW (atomic, via @upstash/ratelimit)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// One Ratelimit instance per distinct (maxRequests, windowMs) config, sharing
+// the single Redis client. Cached so we don't rebuild the Lua script each call.
+const limiterCache = new Map<string, Ratelimit>();
+
+function limiterFor(client: Redis, config: RateLimitConfig): Ratelimit {
+    const cacheKey = `${config.maxRequests}:${config.windowMs}`;
+    let limiter = limiterCache.get(cacheKey);
+    if (!limiter) {
+        limiter = new Ratelimit({
+            redis: client,
+            limiter: Ratelimit.slidingWindow(
+                config.maxRequests,
+                `${config.windowMs} ms`
+            ),
+            prefix: "rl",
+            analytics: false,
+        });
+        limiterCache.set(cacheKey, limiter);
+    }
+    return limiter;
+}
+
+async function checkRedis(
+    client: Redis,
+    key: string,
+    config: RateLimitConfig
+): Promise<RateLimitResult> {
+    const { success, remaining, reset } = await limiterFor(client, config).limit(key);
+    return {
+        allowed: success,
+        remaining: Math.max(remaining, 0),
+        resetMs: Math.max(reset - Date.now(), 0),
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PUBLIC API
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Check if a request is allowed under rate limiting.
+ *
+ * @param key - Unique identifier (userId, IP, etc.)
+ * @param config - Rate limit configuration
+ */
+export async function checkRateLimit(
+    key: string,
+    config: RateLimitConfig
+): Promise<RateLimitResult> {
+    const client = getRedis();
+    if (!client) return checkInMemory(key, config);
+
+    try {
+        return await checkRedis(client, key, config);
+    } catch (err) {
+        // Never let a limiter outage take down the route — fail open to the
+        // in-memory limiter rather than 500ing.
+        console.error("Redis rate limit error, falling back to in-memory:", err);
+        return checkInMemory(key, config);
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

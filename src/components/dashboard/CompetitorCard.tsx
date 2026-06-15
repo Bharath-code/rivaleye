@@ -57,6 +57,21 @@ export function CompetitorCard({
     onDelete,
     onNavigate,
 }: CompetitorCardProps) {
+    // UX-1: a competitor always gets a first crawl triggered on add, so a
+    // recently-created, never-checked active row means that first scan is still
+    // in flight. Show an optimistic "scanning" state instead of a bare "Never".
+    // Bounded by created_at so a silently-failed first scan doesn't claim to be
+    // "scanning" forever.
+    const FIRST_SCAN_WINDOW_MS = 30 * 60 * 1000;
+    const createdRecently =
+        Date.now() - new Date(competitor.created_at).getTime() < FIRST_SCAN_WINDOW_MS;
+    const isFirstScanPending =
+        competitor.last_checked_at === null &&
+        competitor.status === "active" &&
+        competitor.failure_count === 0 &&
+        createdRecently;
+    const isScanning = analyzingId === competitor.id || isFirstScanPending;
+
     return (
         <Card className="glass-card hover:border-emerald-500/30 transition-colors cursor-pointer">
             <CardHeader className="pb-2">
@@ -122,10 +137,17 @@ export function CompetitorCard({
             </CardHeader>
             <CardContent>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatRelativeTime(competitor.last_checked_at)}
-                    </span>
+                    {isFirstScanPending ? (
+                        <span className="flex items-center gap-1.5 text-emerald-400">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Running first scan…
+                        </span>
+                    ) : (
+                        <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {formatRelativeTime(competitor.last_checked_at)}
+                        </span>
+                    )}
                     {competitor.failure_count > 0 && (
                         <span className="flex items-center gap-1 text-amber-500">
                             <AlertCircle className="w-3 h-3" />
@@ -139,9 +161,9 @@ export function CompetitorCard({
                         size="sm"
                         className="w-full text-xs h-9 bg-emerald-500/[0.05] border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-black hover:border-emerald-500 transition-all duration-300 font-medium"
                         onClick={() => onAnalyze(competitor.id)}
-                        disabled={analyzingId === competitor.id}
+                        disabled={isScanning}
                     >
-                        {analyzingId === competitor.id ? (
+                        {isScanning ? (
                             <>
                                 <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
                                 Scanning...

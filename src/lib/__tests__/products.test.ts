@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { products } from '../products';
+import { PLAN_PRICING } from '../billing/featureFlags';
 
 describe('products', () => {
     it('should have a list of products', () => {
@@ -18,9 +19,14 @@ describe('products', () => {
         });
     });
 
-    it('should include specific plans', () => {
+    it('should include the Pro plan', () => {
         const productNames = products.map(p => p.name);
-        expect(productNames).toContain('Basic Plan');
-        expect(productNames).toContain('Premium Plan');
+        expect(productNames).toContain('Pro');
+    });
+
+    it('should derive price from PLAN_PRICING (single source of truth)', () => {
+        const pro = products.find(p => p.name === 'Pro');
+        expect(pro).toBeDefined();
+        expect(pro!.price).toBe(PLAN_PRICING.pro.monthly * 100);
     });
 });

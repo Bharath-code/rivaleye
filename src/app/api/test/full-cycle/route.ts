@@ -2,14 +2,43 @@ import { NextRequest, NextResponse } from "next/server";
 import { triggerManualCheck } from "@/trigger/dailyPricingAnalysis";
 import { deepAuditTask } from "@/trigger/deepAudit";
 import { createServerClient } from "@/lib/supabase";
+import { getUserId } from "@/lib/auth";
+import { assertSameOrigin } from "@/lib/csrf";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 /**
  * ⚠️ TEST ONLY: Full Cycle Verification
- * 
+ *
  * Triggers both pricing and deep audit tasks for a competitor.
+ *
+ * Hardened (SEC-1): disabled in production, and in non-prod requires
+ * a same-origin authenticated request whose user OWNS the competitor,
+ * behind a rate limit. Previously this was unauthenticated and could be
+ * used to burn Firecrawl + AI budget for any competitorId.
  */
 export async function POST(req: NextRequest) {
+    // Hard off-switch in production.
+    if (process.env.NODE_ENV === "production") {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     try {
+        const csrf = assertSameOrigin(req);
+        if (csrf) return csrf;
+
+        const userId = await getUserId();
+        if (!userId) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const rate = await checkRateLimit(`test-full-cycle:${userId}`, RATE_LIMITS.analysis);
+        if (!rate.allowed) {
+            return NextResponse.json(
+                { error: "Too many requests" },
+                { status: 429 }
+            );
+        }
+
         const { competitorId } = await req.json();
 
         if (!competitorId) {
@@ -18,11 +47,12 @@ export async function POST(req: NextRequest) {
 
         const supabase = createServerClient();
 
-        // Get competitor details
+        // Get competitor details — scoped to the caller (ownership check).
         const { data: competitor } = await supabase
             .from("competitors")
             .select("*, users(plan)")
             .eq("id", competitorId)
+            .eq("user_id", userId)
             .single();
 
         if (!competitor) {

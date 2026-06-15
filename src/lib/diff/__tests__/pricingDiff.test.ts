@@ -130,6 +130,24 @@ describe('pricingDiff', () => {
                 expect(priceDiff).toBeDefined()
             })
 
+            it('scales severity by magnitude: a 300% hike ranks strictly above a 6% bump (CALC-1)', () => {
+                const small = diffPricing(
+                    createMockSchema({ plans: [createMockPlan({ price_raw: '$49/month' })] }),
+                    createMockSchema({ plans: [createMockPlan({ price_raw: '$52/month' })] }) // ~6%
+                ).diffs.find(d => d.type === 'price_increase')
+
+                const large = diffPricing(
+                    createMockSchema({ plans: [createMockPlan({ price_raw: '$49/month' })] }),
+                    createMockSchema({ plans: [createMockPlan({ price_raw: '$196/month' })] }) // ~300%
+                ).diffs.find(d => d.type === 'price_increase')
+
+                expect(small).toBeDefined()
+                expect(large).toBeDefined()
+                expect(large!.severity).toBeGreaterThan(small!.severity)
+                expect(small!.severity).toBeGreaterThanOrEqual(0.5) // still alertable
+                expect(large!.severity).toBeLessThanOrEqual(0.95)   // capped below free_tier_removed=1.0
+            })
+
             it('ignores small price changes < 5%', () => {
                 const before = createMockSchema({
                     plans: [createMockPlan({ price_raw: '$49/month' })],
