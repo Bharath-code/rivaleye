@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Send, Sparkles, Sword, MessageSquare, Zap, Check, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { analytics } from "@/components/providers/AnalyticsProvider";
 
 interface TacticalPlaybook {
     salesDraft?: string;
@@ -29,6 +30,19 @@ export function CompetitiveResponseBrief({
     const [copiedSection, setCopiedSection] = useState<string | null>(null);
     const [isPushing, setIsPushing] = useState(false);
     const [pushStatus, setPushStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+    // UX-3: track brief views, and the first one as the activation milestone.
+    useEffect(() => {
+        analytics.briefViewed(alertId);
+        try {
+            if (!localStorage.getItem("first_brief_viewed")) {
+                localStorage.setItem("first_brief_viewed", "1");
+                analytics.firstBriefViewed();
+            }
+        } catch {
+            // localStorage unavailable (private mode) — non-blocking
+        }
+    }, [alertId]);
 
     const handleCopy = (text: string, section: string) => {
         navigator.clipboard.writeText(text);

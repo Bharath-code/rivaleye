@@ -43,7 +43,7 @@ export async function POST(request: Request) {
         }
 
         // ── 2. Rate limit ──
-        const rateCheck = checkRateLimit(`analysis:${userId}`, RATE_LIMITS.analysis);
+        const rateCheck = await checkRateLimit(`analysis:${userId}`, RATE_LIMITS.analysis);
         if (!rateCheck.allowed) {
             return NextResponse.json(
                 { error: "Too many analysis requests. Please wait a few minutes." },

@@ -37,28 +37,22 @@ export async function GET(
         { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // Fetch all active competitors, then filter by slug (hostname match)
-    // In production this would be a `select where url ilike '%host%'` or
-    // a dedicated `public_slug` column. For MVP, do an in-memory filter.
-    const { data: competitors, error } = await supabase
+    // Indexed lookup by public_slug (SEC-4/PERF-1) — replaces the old 500-row
+    // in-memory scan. Only rows explicitly listed for public exposure match.
+    const { data: matches, error } = await supabase
         .from("competitors")
         .select("id, name, url, status, last_checked_at, created_at")
+        .eq("public_slug", normalized)
         .eq("status", "active")
-        .limit(500);
+        .eq("public_listed", true)
+        .limit(1);
 
     if (error) {
         console.error("[Public Tracker] DB error:", error);
         return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
     }
 
-    const match = competitors?.find((c) => {
-        try {
-            const host = new URL(c.url).hostname.toLowerCase().replace(/\./g, "-");
-            return host === normalized;
-        } catch {
-            return false;
-        }
-    });
+    const match = matches?.[0];
 
     if (!match) {
         return NextResponse.json(

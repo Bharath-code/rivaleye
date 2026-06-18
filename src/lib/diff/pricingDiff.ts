@@ -50,6 +50,24 @@ const SEVERITY_WEIGHTS: Record<PricingDiffType, number> = {
     regional_difference: 0.6,
 };
 
+/**
+ * Magnitude-aware severity for price changes (CALC-1).
+ *
+ * Previously every price change used a flat weight (0.9 / 0.85), so a +6%
+ * tweak and a +300% hike scored identically. Now severity ramps from a floor
+ * at the 5% alert threshold up toward (but never reaching) free_tier_removed=1.0,
+ * so larger moves rank strictly higher. Increases weigh slightly more than
+ * decreases at equal magnitude.
+ *
+ * 5% → ~0.60, 25% → ~0.68, 100% → 0.95 (cap), 300% → 0.95 (cap).
+ */
+function computePriceSeverity(isIncrease: boolean, percentChange: number): number {
+    const base = isIncrease ? 0.6 : 0.55;
+    const magnitudeBonus = Math.min(Math.max(percentChange - 5, 0) * 0.004, 0.35);
+    const severity = Math.min(base + magnitudeBonus, 0.95);
+    return Math.round(severity * 100) / 100;
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN DIFF FUNCTION
 // ══════════════════════════════════════════════════════════════════════════════
@@ -191,9 +209,7 @@ function checkPriceChanges(
             if (percentChange >= 5) {
                 diffs.push({
                     type: isIncrease ? "price_increase" : "price_decrease",
-                    severity: isIncrease
-                        ? SEVERITY_WEIGHTS.price_increase
-                        : SEVERITY_WEIGHTS.price_decrease,
+                    severity: computePriceSeverity(isIncrease, percentChange),
                     planName: afterPlan.name,
                     before: beforePlan.price_raw,
                     after: afterPlan.price_raw,

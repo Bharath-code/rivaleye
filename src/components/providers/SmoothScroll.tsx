@@ -14,7 +14,14 @@ interface SmoothScrollProps {
 
 export const SmoothScroll = ({ children }: SmoothScrollProps) => {
     useEffect(() => {
-        // Initialize Lenis
+        // PERF-2 / a11y: respect prefers-reduced-motion. Smooth-scroll hijacking
+        // is jarring and can trigger motion sickness; users who ask for reduced
+        // motion get native scrolling.
+        const prefersReduced = window.matchMedia(
+            "(prefers-reduced-motion: reduce)"
+        ).matches;
+        if (prefersReduced) return;
+
         const lenis = new Lenis({
             duration: 1.2,
             easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
@@ -25,25 +32,19 @@ export const SmoothScroll = ({ children }: SmoothScrollProps) => {
             touchMultiplier: 2,
         });
 
-        // Sync ScrollTrigger with Lenis
         lenis.on("scroll", ScrollTrigger.update);
 
-        // GSAP ticker for Lenis
-        gsap.ticker.add((time) => {
-            lenis.raf(time * 1000);
-        });
-
-        // Disable GSAP ticker's lag smoothing for sync
+        // Single ticker reference so cleanup actually removes it (the previous
+        // code passed a fresh arrow fn to remove(), leaking the callback).
+        const tick = (time: number) => lenis.raf(time * 1000);
+        gsap.ticker.add(tick);
         gsap.ticker.lagSmoothing(0);
 
-        // Scroll to top on refresh
         window.scrollTo(0, 0);
 
         return () => {
             lenis.destroy();
-            gsap.ticker.remove((time) => {
-                lenis.raf(time * 1000);
-            });
+            gsap.ticker.remove(tick);
         };
     }, []);
 

@@ -1,35 +1,36 @@
+import { PLAN_PRICING } from "@/lib/billing/featureFlags";
+
 export type Product = {
   product_id: string;
   name: string;
   description: string;
-  price: number;
+  price: number; // in cents
   features: string[];
 };
 
+/**
+ * RivalEye plans. Prices are derived from PLAN_PRICING (single source of
+ * truth) — do NOT hardcode dollar amounts here.
+ *
+ * `product_id` is the Dodo product that charges the card; it comes from env
+ * so test/live modes use the right product. Previously this file shipped a
+ * Dodo template placeholder (Basic $9.99 / Premium $199.99) — that was dead
+ * code and a mispricing landmine if ever wired into checkout (BIZ-1).
+ */
 export const products: Product[] = [
   {
-    product_id: "pdt_0NVDooCIWvJK3JHLAXc95",
-    name: "Basic Plan",
-    description: "Get access to basic features and support",
-    price: 999, // in cents
+    product_id: process.env.DODO_PRO_PRODUCT_ID ?? "",
+    name: "Pro",
+    description: "Full competitive intelligence: 5 competitors, 4 regions, AI tactical briefs, AEO visibility, Slack alerts.",
+    price: PLAN_PRICING.pro.monthly * 100,
     features: [
-      "Access to basic features",
-      "Email support",
-      "1 Team member",
-      "Basic analytics",
-    ],
-  },
-  {
-    product_id: "pdt_002",
-    name: "Premium Plan",
-    description: "Get access to premium features and support",
-    price: 19999, // in cents
-    features: [
-      "Access to all features",
-      "Priority 24/7 support",
-      "Unlimited team members",
-      "Advanced analytics",
-      "Custom integrations",
+      "5 competitors",
+      "4 regions (US, EU, IN, Global)",
+      "AI tactical briefs",
+      "Tech stack + branding alerts",
+      "AEO / AI-visibility scorecard",
+      "Slack integration",
+      "Unlimited alert history",
     ],
   },
 ];

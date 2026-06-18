@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import confetti from "canvas-confetti";
 import { PartyPopper, Twitter, ArrowRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,20 +29,32 @@ export function FirstAlertCelebration({ competitorName, alertTitle, onDismiss }:
     const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {
+        let cancelled = false;
+
         // Delay so the user can see the alert arrive first
         const showTimer = setTimeout(() => setIsVisible(true), 600);
 
-        // Burst confetti when shown
+        // Burst confetti when shown. Dynamically imported so canvas-confetti
+        // stays out of the initial bundle (PERF-2), and skipped under
+        // prefers-reduced-motion (a11y).
+        const prefersReduced = window.matchMedia(
+            "(prefers-reduced-motion: reduce)"
+        ).matches;
         const confettiTimer = setTimeout(() => {
-            confetti({
-                particleCount: 120,
-                spread: 80,
-                origin: { y: 0.6 },
-                colors: ["#10b981", "#34d399", "#6ee7b7", "#fbbf24", "#f59e0b"],
+            if (prefersReduced) return;
+            import("canvas-confetti").then(({ default: confetti }) => {
+                if (cancelled) return; // unmounted before import resolved
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 },
+                    colors: ["#10b981", "#34d399", "#6ee7b7", "#fbbf24", "#f59e0b"],
+                });
             });
         }, 900);
 
         return () => {
+            cancelled = true;
             clearTimeout(showTimer);
             clearTimeout(confettiTimer);
         };

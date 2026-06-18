@@ -27,13 +27,16 @@ export const ALERTABLE_DIFF_TYPES: PricingDiffType[] = [
 
 interface AlertThresholds {
     minSeverity: number;
-    minPriceChangePercent: number;
     cooldownHours: number;
 }
 
+// minSeverity is a backstop gate: current alertable types all weigh >= 0.55,
+// so it rarely fires, but it filters any future low-severity type and is
+// covered by tests. The 5%-price-change floor lives upstream in
+// pricingDiff.checkPriceChanges (a sub-5% move never becomes a diff), so it is
+// intentionally NOT duplicated here (CALC-3).
 const DEFAULT_THRESHOLDS: AlertThresholds = {
     minSeverity: 0.5,            // Only alert on severity >= 0.5
-    minPriceChangePercent: 5,    // Only alert on price changes >= 5%
     cooldownHours: 24,           // Don't re-alert within 24 hours
 };
 
@@ -45,7 +48,7 @@ export interface AlertDecision {
     shouldAlert: boolean;
     reason: string;
     severity: AlertSeverity;
-    priority: number; // 1-10, higher = more important
+    priority: number; // 0-100, higher = more important
 }
 
 /**
@@ -147,19 +150,19 @@ function mapSeverity(severity: number): AlertSeverity {
 }
 
 function calculatePriority(diff: DetectedDiff): number {
-    // Base priority from severity (0-10 scale)
-    let priority = Math.round(diff.severity * 10);
-
-    // Boost for specific high-impact types
-    const boostTypes: Partial<Record<PricingDiffType, number>> = {
-        free_tier_removed: 2,
-        plan_removed: 1,
-        price_increase: 1,
+    // CALC-4: priority is on a 0-100 scale. The old 1-10 integer scale made
+    // boosts collapse — free_tier_removed (1.0) and price_increase (0.9) both
+    // rounded to 10, losing all ranking between top events. Applying the boost
+    // in severity-space first, then mapping to 0-100, keeps distinct types
+    // distinctly ranked (e.g. 100 / 98 / 92).
+    const boostBySeverity: Partial<Record<PricingDiffType, number>> = {
+        free_tier_removed: 0.05,
+        plan_removed: 0.03,
+        price_increase: 0.02,
     };
 
-    priority += boostTypes[diff.type] || 0;
-
-    return Math.min(priority, 10);
+    const adjusted = Math.min(diff.severity + (boostBySeverity[diff.type] || 0), 1.0);
+    return Math.round(adjusted * 100);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

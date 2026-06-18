@@ -27,6 +27,11 @@ export const analytics = {
         posthog.capture('first_scan_completed'),
     firstAlertReceived: () =>
         posthog.capture('first_alert_received'),
+    // UX-3: the true activation aha — user read their first AI tactical brief.
+    briefViewed: (alertId?: string) =>
+        posthog.capture('brief_viewed', { alert_id: alertId }),
+    firstBriefViewed: () =>
+        posthog.capture('first_brief_viewed'),
 
     // Engagement
     alertViewed: (alertId: string, severity: string) =>

@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
         const userLog = withUser(log, userId);
 
         // Rate limit
-        const rateCheck = checkRateLimit(`competitors:${userId}`, RATE_LIMITS.competitors);
+        const rateCheck = await checkRateLimit(`competitors:${userId}`, RATE_LIMITS.competitors);
         if (!rateCheck.allowed) {
             userLog.warn({ rateCheck }, "rate limit hit on POST /api/competitors");
             return NextResponse.json(
