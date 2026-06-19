@@ -12,6 +12,7 @@ import { DashboardAlertSummary } from "@/components/alerts";
 import { OnboardingWizard } from "@/components/onboarding";
 import type { PricingDiffType, AlertSeverity } from "@/lib/types";
 import { MarketRadar } from "@/components/charts";
+import { deriveRadarInsight } from "@/lib/charts/radarInsight";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
@@ -19,6 +20,7 @@ import {
     AnalysisResultModal,
     DeleteCompetitorDialog,
     DashboardSkeleton,
+    DashboardAEOSummary,
 } from "@/components/dashboard";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useDashboardData, type Competitor } from "@/hooks/useDashboardData";
@@ -280,6 +282,13 @@ export default function Dashboard() {
                         </div>
                     </div>
 
+                    {/* AI Visibility (AEO wedge) — surfaced at top level */}
+                    {data.competitors.length > 0 && (
+                        <div className="mb-8">
+                            <DashboardAEOSummary />
+                        </div>
+                    )}
+
                     {/* Market Radar (Pro only) */}
                     {data.userPlan !== "free" && data.radarData.length > 0 && (
                         <Card className="glass-card mb-8 overflow-hidden">
@@ -311,9 +320,7 @@ export default function Dashboard() {
                                                 Strategic Insight
                                             </h4>
                                             <p className="text-[13px] leading-relaxed text-slate-200 font-medium">
-                                                {data.radarData.length > 2
-                                                    ? "Competitive clustering detected in mid-market. Clear disruptor white-space exists in high-feature, low-price quadrant."
-                                                    : "Aggregating data points. Add 2 more competitors to activate high-fidelity quadrant analysis."}
+                                                {deriveRadarInsight(data.radarData)}
                                             </p>
                                         </div>
                                     </div>

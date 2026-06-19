@@ -94,6 +94,13 @@ export default function RootLayout({
       className={`dark ${outfit.variable} ${spaceMono.variable} ${inter.variable}`}
     >
       <body className="bg-background text-foreground antialiased min-h-screen flex flex-col noise-overlay">
+        {/* Mark JS as available so scroll-reveal hiding only applies with JS.
+            Without this, a JS/GSAP failure would leave content invisible. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "document.documentElement.classList.add('js')",
+          }}
+        />
         {/* Skip to content — accessibility */}
         <a
           href="#main-content"
