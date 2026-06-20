@@ -155,6 +155,9 @@ Audit verdict: product is real; all six pillars wired + tested.
 - T5.4 — Fix sitemap path mismatch (`${comp}-pricing` vs generated plain slug).
 - T5.5 — Verify/migrate infra subdomains off `.com` (PostHog ingress, R2 screenshots).
 - T5.6 — Keep `npm run verify` green as the merge gate; expand the tenant-scoping guard usage.
+- T5.7 — **Server-side Turnstile**: the widget is currently client-only (decorative,
+  trivially bypassed by editing client state). Forward the token to a server route that
+  calls Cloudflare `siteverify` and gate Supabase OTP/OAuth initiation on it.
 
 **Acceptance Criteria**
 - [ ] Rate limiting works across instances (load-tested).
