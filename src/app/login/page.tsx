@@ -113,7 +113,7 @@ export default function LoginPage() {
                     <CardDescription>
                         {isSubmitted
                             ? "We sent you a magic link to sign in."
-                            : "Enter your email to receive a magic link."}
+                            : "Continue with Google or GitHub — or use email."}
                     </CardDescription>
                 </CardHeader>
 
@@ -138,25 +138,6 @@ export default function LoginPage() {
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="email">Work email</Label>
-                                <div className="relative">
-                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        placeholder="you@company.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className="pl-10"
-                                        required
-                                    />
-                                </div>
-                                <p className="text-[11px] text-muted-foreground">
-                                    Work email preferred — helps us personalize your intel
-                                </p>
-                            </div>
-
                             {/* Cloudflare Turnstile */}
                             <div className="flex justify-center py-2">
                                 <Turnstile
@@ -172,25 +153,7 @@ export default function LoginPage() {
                                 <p className="text-sm text-red-500 text-center">{error}</p>
                             )}
 
-                            <Button
-                                type="submit"
-                                className="w-full"
-                                disabled={isSubmitting || !email || !turnstileVerified}
-                            >
-                                {isSubmitting ? "Sending link..." : "Send Magic Link"}
-                            </Button>
-
-                            {/* Divider */}
-                            <div className="relative my-6">
-                                <div className="absolute inset-0 flex items-center">
-                                    <span className="w-full border-t border-border" />
-                                </div>
-                                <div className="relative flex justify-center text-xs uppercase">
-                                    <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-                                </div>
-                            </div>
-
-                            {/* Social Login Buttons */}
+                            {/* Social Login Buttons — fastest, one click */}
                             <div className="grid grid-cols-2 gap-3">
                                 <Button
                                     type="button"
@@ -240,6 +203,44 @@ export default function LoginPage() {
                                     GitHub
                                 </Button>
                             </div>
+
+                            {/* Divider */}
+                            <div className="relative my-6">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t border-border" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-card px-2 text-muted-foreground">Or sign in with email</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="email">Work email</Label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="you@company.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="pl-10"
+                                        required
+                                    />
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">
+                                    Work email preferred — helps us personalize your intel
+                                </p>
+                            </div>
+
+                            <Button
+                                type="submit"
+                                variant="outline"
+                                className="w-full"
+                                disabled={isSubmitting || !email || !turnstileVerified}
+                            >
+                                {isSubmitting ? "Sending link..." : "Send Magic Link"}
+                            </Button>
 
                             <p className="text-xs text-center text-muted-foreground">
                                 By signing in, you agree to our{" "}
