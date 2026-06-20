@@ -15,10 +15,14 @@ export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
-    // Turnstile is optional: when no site key is configured (e.g. local dev),
-    // skip the widget and treat the user as verified so the form is usable.
+    // Turnstile is optional in local dev: when no site key is configured, skip
+    // the widget and treat the user as verified so the form is usable. In
+    // PRODUCTION this fails CLOSED — a missing key leaves the user unverified
+    // (login visibly breaks) rather than silently letting everyone through.
     const turnstileEnabled = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-    const [turnstileVerified, setTurnstileVerified] = useState(!turnstileEnabled);
+    const [turnstileVerified, setTurnstileVerified] = useState(
+        !turnstileEnabled && process.env.NODE_ENV !== "production"
+    );
     const [error, setError] = useState<string | null>(null);
     const [socialLoading, setSocialLoading] = useState<string | null>(null);
 
