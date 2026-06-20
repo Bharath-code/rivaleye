@@ -102,7 +102,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                             <div className="flex items-center justify-center gap-6 mb-8 text-sm text-muted-foreground">
                                 <div className="flex items-center gap-2">
                                     <Globe2 className="w-4 h-4 text-emerald-400" />
-                                    <span>8 Regions</span>
+                                    <span>4 Regions</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Sparkles className="w-4 h-4 text-emerald-400" />
