@@ -73,7 +73,7 @@ Respond in JSON ONLY:
   "tacticalPlaybook": {
     "salesDraft": "A ready-to-send email or script for sales teams (if applicable)",
     "productPivot": "Specific feature adjustment or roadmap priority (if applicable)",
-    "marketingAngle": "How to frame this to Kunden/Social Media (if applicable)"
+    "marketingAngle": "How to frame this to customers / social media (if applicable)"
   },
   "confidence": "high|medium|low"
 }
