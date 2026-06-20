@@ -33,6 +33,20 @@ export default function Home() {
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
 
   useGSAP(() => {
+    // Respect reduced-motion: reveal everything instantly, skip scroll tweens.
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (prefersReducedMotion) {
+      gsap.set(".gsap-reveal, .feature-card", {
+        opacity: 1,
+        y: 0,
+        visibility: "visible",
+      });
+      return;
+    }
+
     // Reveal all sections on scroll
     const reveals = gsap.utils.toArray(".gsap-reveal");
 
@@ -349,6 +363,53 @@ export default function Home() {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* AEO / Answer-Engine Section — the wedge */}
+      <section id="aeo" className="py-20 px-6 border-t border-border">
+        <div className="max-w-4xl mx-auto">
+          <div className="glass-card rounded-2xl p-8 sm:p-12 border-emerald-500/20 relative overflow-hidden gsap-reveal">
+            <div className="absolute top-0 left-0 w-40 h-40 bg-emerald-500/5 blur-3xl -ml-20 -mt-20" />
+
+            <div className="flex items-center gap-4 mb-6 relative z-10">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                <Sparkles className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <div className="text-[10px] text-emerald-400 font-mono font-bold tracking-widest uppercase">
+                  New · Answer Engine Optimization
+                </div>
+                <h2 className="font-display text-2xl sm:text-3xl text-foreground">
+                  Track who AI assistants recommend
+                </h2>
+              </div>
+            </div>
+
+            <p className="text-muted-foreground mb-8 leading-relaxed relative z-10 max-w-2xl">
+              Buyers now ask ChatGPT and Perplexity &ldquo;what&apos;s the best tool for X?&rdquo;
+              before they ever hit Google. RivalEye asks the same questions across five
+              answer engines and tells you{" "}
+              <span className="text-foreground font-medium">
+                how often each competitor gets named
+              </span>{" "}
+              — and whether your share is rising or falling.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 relative z-10">
+              {["ChatGPT", "Perplexity", "Claude", "Gemini", "Google AI"].map(
+                (model) => (
+                  <div
+                    key={model}
+                    className="flex items-center justify-center gap-2 p-3 rounded-lg bg-muted/30 text-xs text-foreground border border-border hover:border-emerald-500/30 transition-colors"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    {model}
+                  </div>
+                )
+              )}
+            </div>
           </div>
         </div>
       </section>

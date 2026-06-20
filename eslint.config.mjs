@@ -26,6 +26,7 @@ export default [
             "src/**/__tests__/**",
             "supabase/**",
             "docs/**",
+            ".remember/**",
         ],
     },
     js.configs.recommended,

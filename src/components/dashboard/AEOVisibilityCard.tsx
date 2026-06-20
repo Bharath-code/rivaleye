@@ -156,6 +156,47 @@ export function AEOVisibilityCard({ competitor }: { competitor: AEOCompetitorInp
     const { summary, history } = data;
     const visibility = summary.visibility_pct;
     const trend = computeTrend(history);
+    const hasData = summary.total > 0;
+
+    if (!hasData) {
+        return (
+            <Card className="glass-card">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                        <CardTitle className="text-base">AI Visibility</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent className="text-center py-6">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+                        <Sparkles className="w-6 h-6 text-emerald-400" />
+                    </div>
+                    <p className="text-sm text-foreground font-medium mb-1">
+                        No scans yet
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-[260px] mx-auto leading-relaxed mb-5">
+                        Measure how often ChatGPT, Perplexity, Claude, Gemini and
+                        Google AI mention {data.competitor.name} when buyers ask for
+                        recommendations.
+                    </p>
+                    <Button
+                        onClick={runScan}
+                        disabled={isScanning}
+                        variant="glow-emerald"
+                        size="sm"
+                        className="gap-2"
+                    >
+                        {isScanning ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Sparkles className="w-4 h-4" />
+                        )}
+                        {isScanning ? "Scanning…" : "Run your first scan"}
+                    </Button>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card className="glass-card">
