@@ -15,7 +15,10 @@ export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
-    const [turnstileVerified, setTurnstileVerified] = useState(false);
+    // Turnstile is optional: when no site key is configured (e.g. local dev),
+    // skip the widget and treat the user as verified so the form is usable.
+    const turnstileEnabled = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    const [turnstileVerified, setTurnstileVerified] = useState(!turnstileEnabled);
     const [error, setError] = useState<string | null>(null);
     const [socialLoading, setSocialLoading] = useState<string | null>(null);
 
@@ -138,16 +141,18 @@ export default function LoginPage() {
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {/* Cloudflare Turnstile */}
-                            <div className="flex justify-center py-2">
-                                <Turnstile
-                                    siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""}
-                                    onSuccess={() => setTurnstileVerified(true)}
-                                    onError={() => setTurnstileVerified(false)}
-                                    onExpire={() => setTurnstileVerified(false)}
-                                    options={{ theme: "dark" }}
-                                />
-                            </div>
+                            {/* Cloudflare Turnstile (only when configured) */}
+                            {turnstileEnabled && (
+                                <div className="flex justify-center py-2">
+                                    <Turnstile
+                                        siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                                        onSuccess={() => setTurnstileVerified(true)}
+                                        onError={() => setTurnstileVerified(false)}
+                                        onExpire={() => setTurnstileVerified(false)}
+                                        options={{ theme: "dark" }}
+                                    />
+                                </div>
+                            )}
 
                             {error && (
                                 <p className="text-sm text-red-500 text-center">{error}</p>
