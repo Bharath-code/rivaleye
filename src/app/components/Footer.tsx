@@ -33,7 +33,7 @@ export default function Footer() {
             Terms
           </Link>
           <a
-            href="mailto:hello@rivaleye.io"
+            href="mailto:hello@rivaleye.app"
             className="hover:text-foreground transition-colors"
           >
             Contact

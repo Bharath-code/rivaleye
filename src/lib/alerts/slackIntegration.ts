@@ -62,7 +62,7 @@ export async function pushToSlack(payload: {
                             text: "View Alert in RivalEye",
                             emoji: true,
                         },
-                        url: payload.link || "https://rivaleye.com/dashboard",
+                        url: payload.link || "https://rivaleye.app/dashboard",
                         style: "primary",
                     },
                 ],

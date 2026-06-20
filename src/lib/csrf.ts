@@ -6,7 +6,7 @@ import { getAllowedOrigins } from "@/lib/validation/schemas";
  *
  * Rejects POST/PATCH/DELETE requests whose Origin header doesn't
  * match the allowed allowlist. Defends against:
- *  - Classic CSRF (malicious page submits a form to rivaleye.com)
+ *  - Classic CSRF (malicious page submits a form to rivaleye.app)
  *  - DNS rebinding attacks
  *  - Cross-origin XHR/fetch abuse
  *

@@ -100,7 +100,7 @@ describe('slackIntegration', () => {
                 title: 'Price Increase Detected',
                 description: 'The price went up by 20%',
                 competitorName: 'Acme Corp',
-                link: 'https://rivaleye.com/alert/123',
+                link: 'https://rivaleye.app/alert/123',
             })
 
             expect(fetchSpy).toHaveBeenCalledWith(
@@ -215,7 +215,7 @@ describe('slackIntegration', () => {
 
             const body = JSON.parse(fetchSpy.mock.calls[0][1].body as string)
             const buttonBlock = body.blocks.find((b: any) => b.type === 'actions')
-            expect(buttonBlock.elements[0].url).toBe('https://rivaleye.com/dashboard')
+            expect(buttonBlock.elements[0].url).toBe('https://rivaleye.app/dashboard')
 
             fetchSpy.mockRestore()
         })

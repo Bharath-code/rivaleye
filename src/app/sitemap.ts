@@ -12,11 +12,11 @@ import industriesData from "@/data/industries.json";
  *  - 1 /track index
  *  - core marketing pages (/, /signup, /login, /#pricing)
  *
- * Submit to Google Search Console: rivaleye.com/sitemap.xml
+ * Submit to Google Search Console: rivaleye.app/sitemap.xml
  */
 
 const SITE_URL =
-    process.env.NEXT_PUBLIC_APP_URL || "https://rivaleye.com";
+    process.env.NEXT_PUBLIC_APP_URL || "https://rivaleye.app";
 
 const TARGET_COMPETITORS = [
     "stripe",
