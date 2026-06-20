@@ -5,6 +5,7 @@ import { parseBody, authSyncSchema } from "@/lib/validation/schemas";
 import { assertSameOrigin } from "@/lib/csrf";
 import { withRequestId } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
+import { getSupabasePublishableKey } from "@/lib/supabaseEnv";
 
 /**
  * Auth Sync API
@@ -52,11 +53,11 @@ export async function POST(request: NextRequest) {
 
         // Verify tokens and get user
         const { createClient } = await import("@supabase/supabase-js");
-        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        const anonKey = getSupabasePublishableKey();
 
         if (!anonKey) {
             return NextResponse.json(
-                { error: "NEXT_PUBLIC_SUPABASE_ANON_KEY is not configured" },
+                { error: "Supabase client key is not configured" },
                 { status: 500, headers: reqHeaders }
             );
         }

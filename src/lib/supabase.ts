@@ -1,21 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
+import { requireSupabaseUrl, requireSupabasePublishableKey } from "./supabaseEnv";
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    throw new Error(
-        "FATAL: NEXT_PUBLIC_SUPABASE_URL is required. " +
-        "Set it in .env.local or your deployment environment."
-    );
-}
-
-if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    throw new Error(
-        "FATAL: NEXT_PUBLIC_SUPABASE_ANON_KEY is required. " +
-        "Set it in .env.local or your deployment environment. " +
-        "Do not rely on NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY — it is not configured."
-    );
-}
-
-const supabaseAnonKey: string = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl: string = requireSupabaseUrl();
+const supabaseAnonKey: string = requireSupabasePublishableKey();
 
 /**
  * Client-side Supabase client.
@@ -26,7 +13,7 @@ const supabaseAnonKey: string = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
  * /api/auth/sync.
  */
 export const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    supabaseUrl,
     supabaseAnonKey,
     {
         auth: {
@@ -83,7 +70,7 @@ export function createServerClient() {
             "RLS will apply. Set this in production to bypass RLS for server operations."
         );
         return createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            supabaseUrl,
             supabaseAnonKey,
             {
                 auth: {
