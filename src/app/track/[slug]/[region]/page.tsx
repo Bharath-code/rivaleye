@@ -44,7 +44,7 @@ const TARGET_COMPETITORS = [
 
 const regions = industriesData.regions;
 
-type PageParams = { competitor: string; region: string };
+type PageParams = { slug: string; region: string };
 
 function isValidCompetitor(slug: string) {
     return TARGET_COMPETITORS.some((c) => c.slug === slug);
@@ -66,7 +66,7 @@ export function generateStaticParams() {
     const params: PageParams[] = [];
     for (const c of TARGET_COMPETITORS) {
         for (const r of regions) {
-            params.push({ competitor: c.slug, region: r.slug });
+            params.push({ slug: c.slug, region: r.slug });
         }
     }
     return params;
@@ -75,8 +75,8 @@ export function generateStaticParams() {
 export async function generateMetadata(
     { params }: { params: Promise<PageParams> }
 ): Promise<Metadata> {
-    const { competitor, region } = await params;
-    const c = getCompetitor(competitor);
+    const { slug, region } = await params;
+    const c = getCompetitor(slug);
     const r = getRegion(region);
     if (!c || !r) return { title: "Page not found" };
 
@@ -102,8 +102,8 @@ export async function generateMetadata(
 export default async function TrackRegionPage(
     { params }: { params: Promise<PageParams> }
 ) {
-    const { competitor, region } = await params;
-    const c = getCompetitor(competitor);
+    const { slug, region } = await params;
+    const c = getCompetitor(slug);
     const r = getRegion(region);
     if (!c || !r) notFound();
 

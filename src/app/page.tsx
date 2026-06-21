@@ -19,7 +19,6 @@ import {
   Sparkles,
   Clock,
   MapPin,
-  Users,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import gsap from "gsap";
@@ -182,19 +181,11 @@ export default function Home() {
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-center gap-3 mt-8 gsap-reveal">
-            <div className="flex -space-x-2">
-              {[...Array(4)].map((_, i) => (
-                <div
-                  key={i}
-                  className="w-8 h-8 rounded-full border-2 border-background bg-gradient-to-br from-emerald-400/30 to-emerald-600/30 flex items-center justify-center"
-                >
-                  <Users className="w-3.5 h-3.5 text-emerald-400/70" />
-                </div>
-              ))}
-            </div>
+          <div className="flex items-center justify-center gap-2 mt-8 gsap-reveal">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <p className="text-sm text-muted-foreground">
-              Trusted by founders who refuse to fly blind.
+              Newly launched — be one of our first design partners.{" "}
+              <span className="text-foreground font-medium">Free forever for your first competitor.</span>
             </p>
           </div>
         </div>
@@ -394,7 +385,7 @@ export default function Home() {
               <span className="text-foreground font-medium">
                 how often each competitor gets named
               </span>{" "}
-              — and whether your share is rising or falling.
+              — and whether their visibility is climbing or slipping over time.
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 relative z-10">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseUrl, getSupabasePublishableKey } from "@/lib/supabaseEnv";
 
 /**
  * Auth Refresh API
@@ -25,17 +26,17 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        const supabaseUrl = getSupabaseUrl();
+        const supabaseKey = getSupabasePublishableKey();
+
+        if (!supabaseUrl || !supabaseKey) {
             return NextResponse.json(
                 { error: "Supabase not configured" },
                 { status: 500 }
             );
         }
 
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-        );
+        const supabase = createClient(supabaseUrl, supabaseKey);
 
         const { data, error } = await supabase.auth.refreshSession({
             refresh_token: refreshToken,

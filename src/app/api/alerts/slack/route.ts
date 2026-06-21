@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
             title: alert.title,
             description: alert.description,
             competitorName: alert.competitors.name,
-            link: `${process.env.NEXT_PUBLIC_APP_URL || "https://rivaleye.com"}/dashboard/alerts/${alert.id}`,
+            link: `${process.env.NEXT_PUBLIC_APP_URL || "https://rivaleye.app"}/dashboard/alerts/${alert.id}`,
             playbook: {
                 salesDraft:
                     details.tacticalPlaybook?.salesDraft ||

@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { User } from "@/lib/types";
+import { requireSupabaseUrl, requireSupabasePublishableKey } from "./supabaseEnv";
 
 /**
  * Auth Helper
@@ -20,22 +21,14 @@ import type { User } from "@/lib/types";
 /**
  * Create a Supabase client for server-side auth operations.
  *
- * Throws at boot if the env var is missing — no silent fallback to
- * NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY (which nobody configures).
+ * Throws if no client key is configured. Accepts either the canonical
+ * NEXT_PUBLIC_SUPABASE_ANON_KEY or the newer publishable key name via the
+ * shared resolver in supabaseEnv.
  */
 export function createAuthClient() {
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!anonKey) {
-        throw new Error(
-            "FATAL: NEXT_PUBLIC_SUPABASE_ANON_KEY is required. " +
-            "Set it in .env.local or your deployment environment."
-        );
-    }
-
     return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        anonKey,
+        requireSupabaseUrl(),
+        requireSupabasePublishableKey(),
         {
             auth: {
                 autoRefreshToken: false,

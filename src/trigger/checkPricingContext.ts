@@ -322,7 +322,7 @@ export const checkPricingContext = task({
                                     title: alertContent.headline,
                                     description: alertContent.body,
                                     competitorName,
-                                    link: `${process.env.NEXT_PUBLIC_APP_URL || "https://rivaleye.com"}/dashboard`,
+                                    link: `${process.env.NEXT_PUBLIC_APP_URL || "https://rivaleye.app"}/dashboard`,
                                     playbook: tacticalPlaybook,
                                     webhookUrl: userSettings.slack_webhook_url,
                                 });

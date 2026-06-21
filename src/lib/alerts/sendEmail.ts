@@ -35,7 +35,7 @@ export async function sendAlertEmail(params: AlertEmailParams): Promise<boolean>
     const textContent = buildEmailText(competitorName, pageUrl, insight);
 
     const result = await client.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || "RivalEye <alerts@rivaleye.io>",
+      from: process.env.RESEND_FROM_EMAIL || "RivalEye <alerts@rivaleye.app>",
       to,
       subject,
       html: htmlContent,

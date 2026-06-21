@@ -8,7 +8,7 @@ import type { MetadataRoute } from "next";
  */
 
 const SITE_URL =
-    process.env.NEXT_PUBLIC_APP_URL || "https://rivaleye.com";
+    process.env.NEXT_PUBLIC_APP_URL || "https://rivaleye.app";
 
 export default function robots(): MetadataRoute.Robots {
     return {

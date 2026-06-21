@@ -63,7 +63,7 @@ export function FirstAlertCelebration({ competitorName, alertTitle, onDismiss }:
     if (!isVisible) return null;
 
     const tweetText = encodeURIComponent(
-        `I just caught ${competitorName}'s pricing change on day one with RivalEye 🔥\n\n${alertTitle.slice(0, 100)}\n\nrivaleye.com`
+        `I just caught ${competitorName}'s pricing change on day one with RivalEye 🔥\n\n${alertTitle.slice(0, 100)}\n\nrivaleye.app`
     );
     const tweetUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
 
