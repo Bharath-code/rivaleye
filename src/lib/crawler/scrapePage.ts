@@ -55,6 +55,8 @@ export type ScrapePricingResult =
           /** Firecrawl changeTracking verdict; 'same' → caller may skip diff/AI. */
           changeStatus?: "new" | "same" | "changed" | "removed";
           markdown?: string;
+          /** Firecrawl-hosted screenshot URL (when captureScreenshot). Push to R2 via fetchScreenshotBuffer. */
+          screenshotUrl?: string;
       }
     | {
           success: false;
@@ -103,11 +105,13 @@ export function toPricingSchema(extracted: ExtractedPricing): PricingSchema {
  * @param url - pricing page URL
  * @param context - optional geo context → real Firecrawl proxy exit (`location.country`)
  * @param trackChanges - include changeTracking(json) as a cheap unchanged-page pre-filter
+ * @param captureScreenshot - also request a full-page screenshot (extra Firecrawl cost); URL in result.screenshotUrl
  */
 export async function scrapePricing(
     url: string,
     context?: PricingContext,
-    trackChanges = false
+    trackChanges = false,
+    captureScreenshot = false
 ): Promise<ScrapePricingResult> {
     try {
         const client = getFirecrawlClient();
@@ -122,6 +126,9 @@ export async function scrapePricing(
                 modes: ["json"],
                 schema: PRICING_JSON_SCHEMA,
             });
+        }
+        if (captureScreenshot) {
+            formats.push({ type: "screenshot", fullPage: true });
         }
 
         const options: ScrapeOptions = {
@@ -144,6 +151,7 @@ export async function scrapePricing(
             json?: unknown;
             markdown?: string;
             changeTracking?: { changeStatus?: "new" | "same" | "changed" | "removed" };
+            screenshot?: string;
         };
 
         const parsed = PRICING_SCHEMA.safeParse(result?.json);
@@ -159,6 +167,7 @@ export async function scrapePricing(
             pricingSchema: toPricingSchema(parsed.data),
             changeStatus: result.changeTracking?.changeStatus,
             markdown: result.markdown,
+            screenshotUrl: result.screenshot,
         };
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Unknown error";
@@ -166,4 +175,20 @@ export async function scrapePricing(
         if (/403|blocked/i.test(message)) return { success: false, error: "Blocked by bot protection", code: "BLOCKED" };
         return { success: false, error: message, code: "UNKNOWN" };
     }
+}
+
+/**
+ * Fetch a Firecrawl-hosted screenshot URL into a Buffer for R2 upload.
+ *
+ * Firecrawl returns the screenshot as a temporary URL, not bytes; R2's
+ * uploadScreenshot() takes a Buffer. This is the only glue between them, so the
+ * pipeline can do: uploadScreenshot(id, key, await fetchScreenshotBuffer(url)).
+ *
+ * ponytail: Firecrawl serves PNG/JPEG; screenshotStorage still labels .webp —
+ * cosmetic content-type mismatch, fix when the live pipeline cuts over (P3).
+ */
+export async function fetchScreenshotBuffer(url: string): Promise<Buffer> {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Screenshot fetch failed: ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
 }

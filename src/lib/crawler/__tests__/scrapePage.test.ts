@@ -7,7 +7,7 @@ vi.mock("../firecrawl", () => ({
     getFirecrawlClient: () => ({ scrape: mockScrape }),
 }));
 
-import { scrapePricing, toPricingSchema, isFirecrawlExtractorEnabled, type ExtractedPricing } from "../scrapePage";
+import { scrapePricing, toPricingSchema, isFirecrawlExtractorEnabled, fetchScreenshotBuffer, type ExtractedPricing } from "../scrapePage";
 
 const extracted: ExtractedPricing = {
     currency: "USD",
@@ -77,9 +77,55 @@ describe("scrapePricing", () => {
         if (!res.success) expect(res.code).toBe("PARSE");
     });
 
+    it("requests a screenshot format only when asked, and returns its URL", async () => {
+        mockScrape.mockResolvedValue({ json: extracted, screenshot: "https://fc.dev/shot.png" });
+        const res = await scrapePricing("https://x.com/pricing", undefined, false, true);
+        expect(res.success && res.screenshotUrl).toBe("https://fc.dev/shot.png");
+        const formats = mockScrape.mock.calls[0][1].formats;
+        expect(formats).toContainEqual({ type: "screenshot", fullPage: true });
+    });
+
+    it("omits the screenshot format by default", async () => {
+        mockScrape.mockResolvedValue({ json: extracted });
+        await scrapePricing("https://x.com/pricing");
+        const formats = mockScrape.mock.calls[0][1].formats;
+        expect(formats.some((f: unknown) => typeof f === "object" && f !== null && (f as { type?: string }).type === "screenshot")).toBe(false);
+    });
+
+    it("sends real geo (location.country + languages) to Firecrawl when context has a country", async () => {
+        mockScrape.mockResolvedValue({ json: extracted });
+        const ctx = { id: "c1", key: "eu", country: "DE", currency: "EUR", locale: "de-DE", timezone: "Europe/Berlin", requires_browser: false, created_at: "" } as const;
+        await scrapePricing("https://x.com/pricing", ctx);
+        expect(mockScrape.mock.calls[0][1].location).toEqual({ country: "DE", languages: ["de-DE"] });
+    });
+
+    it("omits location when the context country is null", async () => {
+        mockScrape.mockResolvedValue({ json: extracted });
+        const ctx = { id: "c1", key: "global", country: null, currency: null, locale: "en-US", timezone: "UTC", requires_browser: false, created_at: "" } as const;
+        await scrapePricing("https://x.com/pricing", ctx);
+        expect(mockScrape.mock.calls[0][1].location).toBeUndefined();
+    });
+
     it("flag defaults off", () => {
         expect(isFirecrawlExtractorEnabled()).toBe(false);
         process.env.FIRECRAWL_EXTRACTOR = "1";
         expect(isFirecrawlExtractorEnabled()).toBe(true);
+    });
+});
+
+describe("fetchScreenshotBuffer", () => {
+    it("fetches a screenshot URL into a Buffer", async () => {
+        const bytes = new Uint8Array([1, 2, 3, 4]);
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => bytes.buffer }));
+        const buf = await fetchScreenshotBuffer("https://fc.dev/shot.png");
+        expect(Buffer.isBuffer(buf)).toBe(true);
+        expect([...buf]).toEqual([1, 2, 3, 4]);
+        vi.unstubAllGlobals();
+    });
+
+    it("throws on a non-ok response", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+        await expect(fetchScreenshotBuffer("https://fc.dev/missing.png")).rejects.toThrow("404");
+        vi.unstubAllGlobals();
     });
 });
