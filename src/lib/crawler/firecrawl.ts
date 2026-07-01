@@ -10,7 +10,7 @@ import type { CrawlResponse } from "@/lib/types";
 
 const TIMEOUT_MS = 30000;
 
-function getFirecrawlClient(): FirecrawlApp {
+export function getFirecrawlClient(): FirecrawlApp {
     const apiKey = process.env.FIRECRAWL_API_KEY;
     if (!apiKey) {
         throw new Error("Missing FIRECRAWL_API_KEY environment variable");
