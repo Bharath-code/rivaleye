@@ -14,7 +14,8 @@
     "verify": "npm run typecheck:ci && npm run test:run && npm run build",
     "typecheck:ci": "node ./scripts/ci-typecheck.mjs",
     "ci": "npm run typecheck:ci && npm run test:run && npm run build",
-    "verify:local": "env $(grep -v '^#' .env.verify | xargs) npm run verify"
+    "verify:local": "env $(grep -v '^#' .env.verify | xargs) npm run verify",
+    "shadow": "env $(grep -vE '^#|^$' .env | sed 's/#.*//' | xargs) SHADOW_URLS=\"${SHADOW_URLS:-https://vercel.com/pricing,https://linear.app/pricing}\" vitest run scripts/shadow-parity.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.962.0",
