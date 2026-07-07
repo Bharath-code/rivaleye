@@ -1,9 +1,11 @@
 import { task, logger, metadata } from "@trigger.dev/sdk/v3";
 import { createClient } from "@supabase/supabase-js";
-import type { PricingContext, PricingSnapshot, PricingDiff, UserSettings } from "@/lib/types";
+import { createHash } from "crypto";
+import type { PricingContext, PricingSchema, PricingSnapshot, PricingDiff, UserSettings } from "@/lib/types";
 import { DEFAULT_USER_SETTINGS } from "@/lib/types";
 import { scrapeWithGeoContext, closeGeoBrowser } from "@/lib/crawler/geoPlaywright";
-import { decideScraper, getCurrencySymbols, shouldUpgradeToPlaywright } from "@/lib/crawler";
+import { decideScraper } from "@/lib/crawler";
+import { scrapePricing, fetchScreenshotBuffer, isFirecrawlExtractorEnabled } from "@/lib/crawler/scrapePage";
 import { uploadScreenshot, getScreenshotUrl } from "@/lib/crawler/screenshotStorage";
 import { diffPricing, type PricingDiffResult } from "@/lib/diff/pricingDiff";
 import { generatePricingInsight, generateFallbackInsight } from "@/lib/diff/pricingInsights";
@@ -89,16 +91,7 @@ export const checkPricingContext = task({
 
             const lastSnapshot = prevSnapshots?.[0] as PricingSnapshot | undefined;
 
-            // Step 2: Decide which scraper to use
-            const scraperType = decideScraper({
-                context,
-                lastSnapshot: lastSnapshot || null,
-                competitorBestScraper: bestScraper,
-            });
-
-            logger.info(`Using scraper: ${scraperType}`, { reason: context.requires_browser ? "geo-context" : "fallback" });
-
-            // Step 3: Fetch user plan, email, settings, and flags
+            // Step 2: Fetch user plan, email, settings, and flags
             const { data: userRecord } = await supabase
                 .from("users")
                 .select("plan, email, settings")
@@ -114,33 +107,51 @@ export const checkPricingContext = task({
             const { getFeatureFlags } = await import("@/lib/billing/featureFlags");
             const flags = getFeatureFlags(userPlan);
 
-            // Step 4: Scrape with geo-context
-            metadata.set("step", `Scraping with ${scraperType}`);
+            // Step 3: Scrape — Firecrawl structured extractor (flag) or Playwright geo path.
+            // ponytail: dual-path behind FIRECRAWL_EXTRACTOR so parity can be proven live
+            // before the Playwright cascade is deleted (P3). Default stays Playwright.
+            let scraperType: "firecrawl" | "playwright";
+            let scrapeResult:
+                | { success: true; pricingSchema: PricingSchema; screenshot: Buffer | null; domHash: string; currencyDetected: string | null }
+                | { success: false; error: string };
 
-            let scrapeResult;
-            if (scraperType === "playwright") {
-                scrapeResult = await scrapeWithGeoContext(competitorUrl, context);
-            } else {
-                // Firecrawl fallback with upgrade check
-                const { fetchPageWithFallback } = await import("@/lib/crawler");
-                const firecrawlResult = await fetchPageWithFallback(competitorUrl);
-
-                if (!firecrawlResult.success) {
-                    // Fall back to Playwright
-                    logger.info("Firecrawl failed, falling back to Playwright");
-                    scrapeResult = await scrapeWithGeoContext(competitorUrl, context);
+            if (isFirecrawlExtractorEnabled()) {
+                scraperType = "firecrawl";
+                metadata.set("step", "Scraping with Firecrawl extractor");
+                const fc = await scrapePricing(competitorUrl, context, false, flags.canViewScreenshots);
+                if (!fc.success) {
+                    scrapeResult = { success: false, error: fc.error };
                 } else {
-                    // Check if we should upgrade to Playwright
-                    const currencySymbols = getCurrencySymbols(context.key);
-                    if (shouldUpgradeToPlaywright(firecrawlResult.markdown || "", currencySymbols)) {
-                        logger.info("Upgrading to Playwright for better content");
-                        scrapeResult = await scrapeWithGeoContext(competitorUrl, context);
-                    } else {
-                        // Use Firecrawl result
-                        scrapeResult = await scrapeWithGeoContext(competitorUrl, context);
+                    let shot: Buffer | null = null;
+                    if (fc.screenshotUrl) {
+                        try {
+                            shot = await fetchScreenshotBuffer(fc.screenshotUrl);
+                        } catch (err) {
+                            logger.warn("Screenshot fetch failed", { error: err });
+                        }
                     }
+                    scrapeResult = {
+                        success: true,
+                        pricingSchema: fc.pricingSchema,
+                        screenshot: shot,
+                        domHash: createHash("sha256")
+                            .update(fc.markdown || JSON.stringify(fc.pricingSchema))
+                            .digest("hex")
+                            .slice(0, 16),
+                        currencyDetected: fc.pricingSchema.currency,
+                    };
                 }
+            } else {
+                scraperType = decideScraper({
+                    context,
+                    lastSnapshot: lastSnapshot || null,
+                    competitorBestScraper: bestScraper,
+                });
+                metadata.set("step", `Scraping with ${scraperType}`);
+                scrapeResult = await scrapeWithGeoContext(competitorUrl, context);
             }
+
+            logger.info(`Using scraper: ${scraperType}`);
 
             if (!scrapeResult.success) {
                 logger.error("Scrape failed", { error: scrapeResult.error });
@@ -156,7 +167,7 @@ export const checkPricingContext = task({
             metadata.set("step", "Uploading screenshot");
             let screenshotPath: string | null = null;
 
-            if (flags.canViewScreenshots) {
+            if (flags.canViewScreenshots && scrapeResult.screenshot) {
                 const uploadResult = await uploadScreenshot(
                     competitorId,
                     context.key,
