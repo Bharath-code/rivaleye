@@ -132,6 +132,50 @@ Each phase is independently shippable and guarded so it can land without a big-b
 
 ---
 
+## Progress + corrected P3 scope (2026-07-07)
+
+**Done and shipped (flag-gated, on `feat/firecrawl-consolidation`):**
+- P1 extractor (`scrapePage.ts`), P2 screenshot+geo glue — committed earlier.
+- **P3 rewire (`25cca18`)**: `checkPricingContext` dual-paths behind `FIRECRAWL_EXTRACTOR`
+  (flag on → `scrapePricing`; flag off → Playwright geo path, still the default). Reversible;
+  no cutover yet.
+- **Parity validated**: Firecrawl extraction correct on 8 live SaaS pricing pages (ground-truth
+  eyeball; the automated Playwright control couldn't run locally — no browser). No `price_raw`
+  normalization needed: the diff engine already numeric-normalizes via `extractNumericPrice`.
+- **Automated gate wired (`6634773`)**: opt-in `shadow-parity` CI job (`scripts/shadow-parity.test.ts`).
+
+**The deletions are NOT a clean tail — corrected scope, blocked in this order:**
+1. **The gate imports what the deletion removes.** `scripts/shadow-parity.test.ts` imports
+   `scrapeWithGeoContext` from `geoPlaywright.ts` to compare against. The gate MUST run green
+   *before* `geoPlaywright` is deleted — deletion can't precede or coexist with it.
+2. **The gate needs the `FIRECRAWL_API_KEY` repo secret** (GitHub UI). Until it's added and the
+   job is green, the cutover is unauthorized.
+3. **The flag defaults OFF**, so the current default pricing path *is* `geoPlaywright`. Deleting
+   it forces an unproven Firecrawl-only cutover — do only after (1)+(2).
+
+**`playwright` is load-bearing for FIVE modules, not just the pricing cascade:**
+`geoPlaywright`, `visionPricing`, `screenshot.ts` (pricing/vision) **plus** the survivors
+`techStackDetector`, `performanceInsights`, and the trigger jobs `analyzeCompetitor` +
+`dailyAnalysis`. So "remove the `playwright` dep + Trigger build extension" only pays off once
+**all five** consumers are migrated. Piecemeal migration removes no dependency.
+
+- **`techStackDetector` → Firecrawl `rawHtml` regresses detection**: Firecrawl gives html +
+  `<script src>` tags but NOT runtime `window` globals and NOT response headers. That drops all
+  `globals` signatures and header-only signatures (Netlify, AWS CloudFront, primary Vercel/
+  Cloudflare via `cf-ray`/`x-vercel`). Only worth doing as part of the full 5-module migration,
+  not alone.
+
+**Recommended remaining sequence (revised):**
+- **P3a (after gate green)** — flip default to Firecrawl; delete pricing cascade
+  (`geoPlaywright`/`geoContext`/`decideScraper`/`visionPricing`/`cheerio.ts`/`playwright.ts`) +
+  `cheerio` dep + their tests; trim the `index.ts` barrel; drop `geoPlaywright` from the shadow
+  test. KEEP `playwright` dep, `screenshot.ts`, and the Trigger extension (survivors still need them).
+- **P3b (separate project)** — migrate the five Playwright consumers (accepting the techStack
+  detection tradeoff or sourcing headers another way), THEN remove the `playwright` dep + Trigger
+  build extension.
+
+---
+
 ## Verification
 
 - **Parity first:** shadow-run `scrapePage.ts` vs. current Playwright/Gemini path on ~10 live
