@@ -48,3 +48,6 @@ supabase/.temp/
 debug/
 
 manual
+.agents/
+.claude/
+skills-lock.json
