@@ -33,6 +33,23 @@ describe('screenshotStorage', () => {
         vi.restoreAllMocks()
     })
 
+    describe('uploadScreenshot content sniffing', () => {
+        it('labels the object by its actual image type', async () => {
+            mockSend.mockResolvedValue({})
+            const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(8)])
+            const jpg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(8)])
+            const other = Buffer.alloc(8)
+
+            const p = await uploadScreenshot('c1', 'us', png)
+            const j = await uploadScreenshot('c1', 'us', jpg)
+            const w = await uploadScreenshot('c1', 'us', other)
+
+            expect(p.success && p.path.endsWith('.png')).toBe(true)
+            expect(j.success && j.path.endsWith('.jpg')).toBe(true)
+            expect(w.success && w.path.endsWith('.webp')).toBe(true)
+        })
+    })
+
     describe('getScreenshotUrl', () => {
         it('returns path when no base URL is configured', () => {
             delete process.env.NEXT_PUBLIC_R2_PUBLIC_URL

@@ -4,14 +4,12 @@ import type { PricingContext, PricingPlan, PricingSchema } from "@/lib/types";
 import { getFirecrawlClient } from "./firecrawl";
 
 /**
- * Firecrawl-v2 structured pricing extractor (P1, flag-gated).
+ * Firecrawl-v2 structured pricing extractor — the pricing scrape path (P3 cutover done).
  *
- * Replaces the Playwright-screenshot + Gemini-vision extractor with a single
+ * Replaced the Playwright-screenshot + Gemini-vision extractor with a single
  * hosted Firecrawl `scrape` using `json` structured extraction. Output is
  * mapped to the canonical `PricingSchema` so the deterministic diff engine
  * (`src/lib/diff/**`) consumes it unchanged.
- *
- * ponytail: additive + behind FIRECRAWL_EXTRACTOR — no cutover here (that's P3).
  */
 
 const TIMEOUT_MS = 45000;
@@ -63,11 +61,6 @@ export type ScrapePricingResult =
           error: string;
           code: "TIMEOUT" | "BLOCKED" | "NO_PRICING" | "PARSE" | "UNKNOWN";
       };
-
-/** P1 gate. Callers run the Firecrawl extractor only when explicitly enabled. */
-export function isFirecrawlExtractorEnabled(): boolean {
-    return process.env.FIRECRAWL_EXTRACTOR === "1";
-}
 
 const ENTERPRISE_RE = /contact|custom|talk to sales|get a quote/i;
 
@@ -184,8 +177,6 @@ export async function scrapePricing(
  * uploadScreenshot() takes a Buffer. This is the only glue between them, so the
  * pipeline can do: uploadScreenshot(id, key, await fetchScreenshotBuffer(url)).
  *
- * ponytail: Firecrawl serves PNG/JPEG; screenshotStorage still labels .webp —
- * cosmetic content-type mismatch, fix when the live pipeline cuts over (P3).
  */
 export async function fetchScreenshotBuffer(url: string): Promise<Buffer> {
     const res = await fetch(url);

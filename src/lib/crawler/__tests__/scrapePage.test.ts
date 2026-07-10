@@ -7,7 +7,7 @@ vi.mock("../firecrawl", () => ({
     getFirecrawlClient: () => ({ scrape: mockScrape }),
 }));
 
-import { scrapePricing, toPricingSchema, isFirecrawlExtractorEnabled, fetchScreenshotBuffer, type ExtractedPricing } from "../scrapePage";
+import { scrapePricing, toPricingSchema, fetchScreenshotBuffer, type ExtractedPricing } from "../scrapePage";
 
 const extracted: ExtractedPricing = {
     currency: "USD",
@@ -22,7 +22,6 @@ const extracted: ExtractedPricing = {
 
 beforeEach(() => {
     mockScrape.mockReset();
-    delete process.env.FIRECRAWL_EXTRACTOR;
 });
 
 describe("toPricingSchema", () => {
@@ -106,11 +105,6 @@ describe("scrapePricing", () => {
         expect(mockScrape.mock.calls[0][1].location).toBeUndefined();
     });
 
-    it("flag defaults off", () => {
-        expect(isFirecrawlExtractorEnabled()).toBe(false);
-        process.env.FIRECRAWL_EXTRACTOR = "1";
-        expect(isFirecrawlExtractorEnabled()).toBe(true);
-    });
 });
 
 describe("fetchScreenshotBuffer", () => {

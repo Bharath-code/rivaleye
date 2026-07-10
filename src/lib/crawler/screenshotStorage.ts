@@ -22,13 +22,21 @@ const s3 = new S3Client({
 /**
  * Upload a screenshot to Cloudflare R2.
  */
+/** Callers hand us PNG (Playwright) or PNG/JPEG (Firecrawl) buffers — sniff, don't assume. */
+function sniffImageType(buf: Buffer): { ext: string; contentType: string } {
+    if (buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50) return { ext: "png", contentType: "image/png" };
+    if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8) return { ext: "jpg", contentType: "image/jpeg" };
+    return { ext: "webp", contentType: "image/webp" };
+}
+
 export async function uploadScreenshot(
     competitorId: string,
     contextKey: string,
     screenshot: Buffer
 ): Promise<{ success: true; path: string } | { success: false; error: string }> {
     const timestamp = Date.now();
-    const path = `${competitorId}/${contextKey}/${timestamp}.webp`;
+    const { ext, contentType } = sniffImageType(screenshot);
+    const path = `${competitorId}/${contextKey}/${timestamp}.${ext}`;
 
     try {
         await s3.send(
@@ -36,7 +44,7 @@ export async function uploadScreenshot(
                 Bucket: BUCKET_NAME,
                 Key: path,
                 Body: screenshot,
-                ContentType: "image/webp",
+                ContentType: contentType,
                 CacheControl: "max-age=31536000", // 1 year cache
             })
         );

@@ -166,10 +166,17 @@ Each phase is independently shippable and guarded so it can land without a big-b
   not alone.
 
 **Recommended remaining sequence (revised):**
-- **P3a (after gate green)** — flip default to Firecrawl; delete pricing cascade
-  (`geoPlaywright`/`geoContext`/`decideScraper`/`visionPricing`/`cheerio.ts`/`playwright.ts`) +
-  `cheerio` dep + their tests; trim the `index.ts` barrel; drop `geoPlaywright` from the shadow
-  test. KEEP `playwright` dep, `screenshot.ts`, and the Trigger extension (survivors still need them).
+- **P3a — DONE (2026-07-10).** Cutover executed on user authorization *without* the automated
+  Playwright-control gate (user declined the local browser install; evidence = 8/8 ground-truth
+  pages + 5/5 live Firecrawl extraction on the CI default URL set). Deleted the pricing cascade
+  (`geoPlaywright`/`geoContext`/`decideScraper`/`visionPricing`/`cheerio.ts`/`playwright.ts`),
+  the `index.ts` barrel (no external consumers), the `cheerio` dep, the `FIRECRAWL_EXTRACTOR`
+  flag (no fallback left to gate), and `bestScraper` plumbing. `checkPricingContext` is
+  Firecrawl-only. The shadow-parity script/CI job became a live Firecrawl extraction smoke test
+  (still opt-in, still needs the `FIRECRAWL_API_KEY` repo secret — not yet added). Bonus fix:
+  `uploadScreenshot` now sniffs PNG/JPEG magic bytes instead of mislabeling everything
+  `image/webp`. KEPT `playwright` dep, `screenshot.ts`, and the Trigger extension (survivors
+  still need them).
 - **P3b (separate project)** — migrate the five Playwright consumers (accepting the techStack
   detection tradeoff or sourcing headers another way), THEN remove the `playwright` dep + Trigger
   build extension.

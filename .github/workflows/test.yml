@@ -197,17 +197,16 @@ jobs:
       #     retention-days: 7
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # SHADOW PARITY — Firecrawl extractor vs Playwright control on LIVE pricing
-  # pages. The P3 deletion gate: proves scrapePricing() matches the current
-  # Playwright/vision path before that path is deleted.
+  # LIVE EXTRACTION SMOKE — Firecrawl extractor against LIVE pricing pages.
+  # (Was the P3 shadow-parity gate; the Playwright control path is deleted.)
   #
-  # Opt-in ONLY (real Firecrawl credits + live network + a browser, and it's
-  # flaky by nature): runs on manual dispatch, or on a PR labeled
-  # "ci:shadow-parity". Never on normal pushes/PRs.
+  # Opt-in ONLY (real Firecrawl credits + live network, and it's flaky by
+  # nature): runs on manual dispatch, or on a PR labeled "ci:shadow-parity".
+  # Never on normal pushes/PRs.
   # Requires repo secret FIRECRAWL_API_KEY.
   # ═══════════════════════════════════════════════════════════════════════════
   shadow-parity:
-    name: Shadow Parity (Firecrawl vs Playwright)
+    name: Live Firecrawl Extraction Smoke
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -238,10 +237,7 @@ jobs:
             exit 1
           fi
 
-      - name: Install Playwright Chromium (control path)
-        run: npx playwright install --with-deps chromium
-
-      - name: Run shadow parity
+      - name: Run live extraction smoke
         run: npx vitest run scripts/shadow-parity.test.ts
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -256,6 +252,6 @@ jobs:
 #   ☑ Do not allow deletions
 # See docs/CI_SETUP.md for the full walkthrough.
 #
-# NOTE: "Shadow Parity" is intentionally NOT a required check — it's opt-in
-# (label a PR "ci:shadow-parity" or run via workflow_dispatch) and gates the
-# Firecrawl P3 deletion PR only. Needs repo secret FIRECRAWL_API_KEY.
+# NOTE: the live extraction smoke is intentionally NOT a required check —
+# it's opt-in (label a PR "ci:shadow-parity" or run via workflow_dispatch).
+# Needs repo secret FIRECRAWL_API_KEY.

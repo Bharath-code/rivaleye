@@ -1,19 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock core lib functions
-vi.mock('@/lib/crawler/geoPlaywright', () => ({
-    scrapeWithGeoContext: vi.fn(),
-    closeGeoBrowser: vi.fn(),
-}));
-
-vi.mock('@/lib/crawler', () => ({
-    decideScraper: vi.fn(() => 'playwright'),
-}));
-
 vi.mock('@/lib/crawler/scrapePage', () => ({
     scrapePricing: vi.fn(),
     fetchScreenshotBuffer: vi.fn(),
-    isFirecrawlExtractorEnabled: vi.fn(() => false),
 }));
 
 vi.mock('@/lib/crawler/screenshotStorage', () => ({
@@ -80,8 +70,7 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 
 import { checkPricingContext } from '../checkPricingContext';
-import { scrapeWithGeoContext } from '@/lib/crawler/geoPlaywright';
-import { scrapePricing, fetchScreenshotBuffer, isFirecrawlExtractorEnabled } from '@/lib/crawler/scrapePage';
+import { scrapePricing, fetchScreenshotBuffer } from '@/lib/crawler/scrapePage';
 import { diffPricing } from '@/lib/diff/pricingDiff';
 import { shouldTriggerAlert } from '@/lib/diff/alertRules';
 import { uploadScreenshot } from '@/lib/crawler/screenshotStorage';
@@ -102,16 +91,16 @@ describe('checkPricingContextTask', () => {
         process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-key';
 
         // Default mock behaviors
-        vi.mocked(isFirecrawlExtractorEnabled).mockReturnValue(false);
         mockSupabase.single.mockResolvedValue({ data: { id: 'snap-123', plan: 'pro', email: 'test@ee.com' }, error: null });
 
-        vi.mocked(scrapeWithGeoContext).mockResolvedValue({
+        vi.mocked(scrapePricing).mockResolvedValue({
             success: true,
-            pricingSchema: { plans: [] } as any,
-            currencyDetected: 'USD',
-            domHash: 'hash',
-            screenshot: Buffer.from('abc'),
-        });
+            pricingSchema: { currency: 'USD', plans: [], has_free_tier: false, highlighted_plan: null },
+            changeStatus: 'changed',
+            markdown: '# Pricing',
+            screenshotUrl: 'https://fc.dev/shot.png',
+        } as any);
+        vi.mocked(fetchScreenshotBuffer).mockResolvedValue(Buffer.from('img'));
 
         vi.mocked(diffPricing).mockReturnValue({
             hasMeaningfulChanges: true,
@@ -142,13 +131,15 @@ describe('checkPricingContextTask', () => {
 
         expect(result.success).toBe(true);
         expect(result.alertCreated).toBe(true);
-        expect(scrapeWithGeoContext).toHaveBeenCalledWith(payload.competitorUrl, payload.context);
+        expect(scrapePricing).toHaveBeenCalledWith(payload.competitorUrl, payload.context, false, true);
+        expect(fetchScreenshotBuffer).toHaveBeenCalledWith('https://fc.dev/shot.png');
     });
 
     it('handles scrape failure', async () => {
-        vi.mocked(scrapeWithGeoContext).mockResolvedValue({
+        vi.mocked(scrapePricing).mockResolvedValue({
             success: false,
             error: 'Scraper blocked',
+            code: 'BLOCKED',
         } as any);
 
         const result = await (checkPricingContext as any).run(payload);
@@ -157,23 +148,13 @@ describe('checkPricingContextTask', () => {
         expect(result.error).toBe('Scraper blocked');
     });
 
-    it('uses Firecrawl extractor when flag enabled, skips Playwright', async () => {
-        vi.mocked(isFirecrawlExtractorEnabled).mockReturnValue(true);
-        vi.mocked(scrapePricing).mockResolvedValue({
-            success: true,
-            pricingSchema: { currency: 'USD', plans: [], has_free_tier: false, highlighted_plan: null },
-            changeStatus: 'changed',
-            markdown: '# Pricing',
-            screenshotUrl: 'https://fc.dev/shot.png',
-        } as any);
-        vi.mocked(fetchScreenshotBuffer).mockResolvedValue(Buffer.from('img'));
+    it('continues without screenshot when the screenshot fetch fails', async () => {
+        vi.mocked(fetchScreenshotBuffer).mockRejectedValue(new Error('404'));
 
         const result = await (checkPricingContext as any).run(payload);
 
         expect(result.success).toBe(true);
-        expect(scrapePricing).toHaveBeenCalledWith(payload.competitorUrl, payload.context, false, true);
-        expect(fetchScreenshotBuffer).toHaveBeenCalledWith('https://fc.dev/shot.png');
-        expect(scrapeWithGeoContext).not.toHaveBeenCalled();
+        expect(uploadScreenshot).not.toHaveBeenCalled();
     });
 
     it('skips alert if change is not meaningful', async () => {

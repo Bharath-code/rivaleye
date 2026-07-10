@@ -3,9 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
 import type { PricingContext, PricingSchema, PricingSnapshot, PricingDiff, UserSettings } from "@/lib/types";
 import { DEFAULT_USER_SETTINGS } from "@/lib/types";
-import { scrapeWithGeoContext, closeGeoBrowser } from "@/lib/crawler/geoPlaywright";
-import { decideScraper } from "@/lib/crawler";
-import { scrapePricing, fetchScreenshotBuffer, isFirecrawlExtractorEnabled } from "@/lib/crawler/scrapePage";
+import { scrapePricing, fetchScreenshotBuffer } from "@/lib/crawler/scrapePage";
 import { uploadScreenshot, getScreenshotUrl } from "@/lib/crawler/screenshotStorage";
 import { diffPricing, type PricingDiffResult } from "@/lib/diff/pricingDiff";
 import { generatePricingInsight, generateFallbackInsight } from "@/lib/diff/pricingInsights";
@@ -30,7 +28,6 @@ interface CheckPricingPayload {
     competitorName: string;
     userId: string;
     context: PricingContext;
-    bestScraper?: "firecrawl" | "playwright" | null;
 }
 
 interface CheckPricingResult {
@@ -65,7 +62,7 @@ export const checkPricingContext = task({
         minTimeoutInMs: 5000,
     },
     run: async (payload: CheckPricingPayload): Promise<CheckPricingResult> => {
-        const { competitorId, competitorUrl, competitorName, userId, context, bestScraper } = payload;
+        const { competitorId, competitorUrl, competitorName, userId, context } = payload;
 
         logger.info("Starting pricing context check", {
             competitor: competitorName,
@@ -107,51 +104,36 @@ export const checkPricingContext = task({
             const { getFeatureFlags } = await import("@/lib/billing/featureFlags");
             const flags = getFeatureFlags(userPlan);
 
-            // Step 3: Scrape — Firecrawl structured extractor (flag) or Playwright geo path.
-            // ponytail: dual-path behind FIRECRAWL_EXTRACTOR so parity can be proven live
-            // before the Playwright cascade is deleted (P3). Default stays Playwright.
-            let scraperType: "firecrawl" | "playwright";
+            // Step 3: Scrape via Firecrawl structured extractor (P3 cutover — cascade deleted)
+            const scraperType = "firecrawl";
+            metadata.set("step", "Scraping with Firecrawl extractor");
             let scrapeResult:
                 | { success: true; pricingSchema: PricingSchema; screenshot: Buffer | null; domHash: string; currencyDetected: string | null }
                 | { success: false; error: string };
 
-            if (isFirecrawlExtractorEnabled()) {
-                scraperType = "firecrawl";
-                metadata.set("step", "Scraping with Firecrawl extractor");
-                const fc = await scrapePricing(competitorUrl, context, false, flags.canViewScreenshots);
-                if (!fc.success) {
-                    scrapeResult = { success: false, error: fc.error };
-                } else {
-                    let shot: Buffer | null = null;
-                    if (fc.screenshotUrl) {
-                        try {
-                            shot = await fetchScreenshotBuffer(fc.screenshotUrl);
-                        } catch (err) {
-                            logger.warn("Screenshot fetch failed", { error: err });
-                        }
-                    }
-                    scrapeResult = {
-                        success: true,
-                        pricingSchema: fc.pricingSchema,
-                        screenshot: shot,
-                        domHash: createHash("sha256")
-                            .update(fc.markdown || JSON.stringify(fc.pricingSchema))
-                            .digest("hex")
-                            .slice(0, 16),
-                        currencyDetected: fc.pricingSchema.currency,
-                    };
-                }
+            const fc = await scrapePricing(competitorUrl, context, false, flags.canViewScreenshots);
+            if (!fc.success) {
+                scrapeResult = { success: false, error: fc.error };
             } else {
-                scraperType = decideScraper({
-                    context,
-                    lastSnapshot: lastSnapshot || null,
-                    competitorBestScraper: bestScraper,
-                });
-                metadata.set("step", `Scraping with ${scraperType}`);
-                scrapeResult = await scrapeWithGeoContext(competitorUrl, context);
+                let shot: Buffer | null = null;
+                if (fc.screenshotUrl) {
+                    try {
+                        shot = await fetchScreenshotBuffer(fc.screenshotUrl);
+                    } catch (err) {
+                        logger.warn("Screenshot fetch failed", { error: err });
+                    }
+                }
+                scrapeResult = {
+                    success: true,
+                    pricingSchema: fc.pricingSchema,
+                    screenshot: shot,
+                    domHash: createHash("sha256")
+                        .update(fc.markdown || JSON.stringify(fc.pricingSchema))
+                        .digest("hex")
+                        .slice(0, 16),
+                    currencyDetected: fc.pricingSchema.currency,
+                };
             }
-
-            logger.info(`Using scraper: ${scraperType}`);
 
             if (!scrapeResult.success) {
                 logger.error("Scrape failed", { error: scrapeResult.error });
@@ -352,17 +334,15 @@ export const checkPricingContext = task({
                 }
             }
 
-            // Step 8: Update competitor's best_scraper if proven
-            if (scraperType) {
-                await supabase
-                    .from("competitors")
-                    .update({
-                        best_scraper: scraperType,
-                        last_checked_at: new Date().toISOString(),
-                        failure_count: 0,
-                    })
-                    .eq("id", competitorId);
-            }
+            // Step 8: Record successful check
+            await supabase
+                .from("competitors")
+                .update({
+                    best_scraper: scraperType,
+                    last_checked_at: new Date().toISOString(),
+                    failure_count: 0,
+                })
+                .eq("id", competitorId);
 
             metadata.set("step", "Complete");
             logger.info("Pricing context check complete", {
@@ -386,9 +366,6 @@ export const checkPricingContext = task({
                 alertCreated: false,
                 error: error instanceof Error ? error.message : "Unknown error",
             };
-        } finally {
-            // Cleanup browser
-            await closeGeoBrowser();
         }
     },
 });
