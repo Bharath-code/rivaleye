@@ -48,6 +48,7 @@ jobs:
             **/*.json
             **/*.sql
             **/*.md
+            .github/workflows/**
           base: ${{ github.base_ref }}
           format: json
           # We treat all changes as "backend" or "frontend" — but since
