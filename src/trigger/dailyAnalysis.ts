@@ -1,5 +1,5 @@
 import { schedules, logger, metadata } from "@trigger.dev/sdk/v3";
-import { chromium } from "playwright";
+import { captureScreenshot } from "@/lib/crawler/screenshot";
 import { hashAnalysis } from "@/lib/crawler/hashAnalysis";
 import type { CompetitorAnalysis } from "@/lib/ai/visionAnalyzer";
 
@@ -88,9 +88,8 @@ export const dailyCompetitorAnalysis = schedules.task({
         metadata.set("status", "Starting analysis...");
 
         const results = { processed: 0, changed: 0, unchanged: 0, errors: 0 };
-        const browser = await chromium.launch({ headless: true });
 
-        try {
+        {
             for (let i = 0; i < competitors.length; i++) {
                 const competitor = competitors[i];
                 const progress = Math.round(((i + 1) / competitors.length) * 100);
@@ -115,16 +114,13 @@ export const dailyCompetitorAnalysis = schedules.task({
 
                     // Screenshot
                     metadata.set("step", "Taking screenshot");
-                    const page = await browser.newPage();
-                    await page.setViewportSize({ width: 1440, height: 900 });
-                    await page.goto(competitor.url, { waitUntil: "networkidle", timeout: 30000 });
-                    await page.waitForTimeout(2000);
-                    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 3));
-                    await page.waitForTimeout(1000);
-                    await page.evaluate(() => window.scrollTo(0, 0));
-
-                    const screenshot = await page.screenshot({ type: "jpeg", quality: 75, fullPage: true });
-                    await page.close();
+                    const shot = await captureScreenshot(competitor.url);
+                    if (!shot.success) {
+                        logger.error(`Screenshot failed: ${competitor.name}`, { error: shot.error });
+                        results.errors++;
+                        continue;
+                    }
+                    const screenshot = shot.screenshot;
 
                     logger.info(`Screenshot: ${screenshot.length} bytes`);
 
@@ -138,7 +134,7 @@ export const dailyCompetitorAnalysis = schedules.task({
                         contents: [{
                             role: "user",
                             parts: [
-                                { inlineData: { mimeType: "image/jpeg", data: base64Image } },
+                                { inlineData: { mimeType: shot.contentType, data: base64Image } },
                                 { text: `Analyze this competitor. Return JSON: companyName, tagline, pricing {plans[]}, features {highlighted[], differentiators[]}, positioning {targetAudience, valueProposition, socialProof[]}, insights[], summary.` }
                             ]
                         }],
@@ -228,8 +224,6 @@ export const dailyCompetitorAnalysis = schedules.task({
                     results.errors++;
                 }
             }
-        } finally {
-            await browser.close();
         }
 
         // Final status

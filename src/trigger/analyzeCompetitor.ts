@@ -1,5 +1,5 @@
 import { task, logger, metadata } from "@trigger.dev/sdk/v3";
-import { chromium } from "playwright";
+import { captureScreenshot } from "@/lib/crawler/screenshot";
 import { hashAnalysis } from "@/lib/crawler/hashAnalysis";
 import type { CompetitorAnalysis } from "@/lib/ai/visionAnalyzer";
 
@@ -50,24 +50,17 @@ export const analyzeCompetitorTask = task({
 
         const prevAnalysis = prevAnalyses?.[0];
 
-        let browser;
         try {
             metadata.set("status", "Taking screenshot");
             metadata.set("progress", 20);
 
-            browser = await chromium.launch({ headless: true });
-            const page = await browser.newPage();
-
-            await page.setViewportSize({ width: 1440, height: 900 });
-            await page.goto(competitorUrl, { waitUntil: "networkidle", timeout: 30000 });
-            await page.waitForTimeout(2000);
-            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 3));
-            await page.waitForTimeout(1000);
-            await page.evaluate(() => window.scrollTo(0, 0));
-
-            const screenshot = await page.screenshot({ type: "jpeg", quality: 75, fullPage: true });
-            await page.close();
-            await browser.close();
+            const shot = await captureScreenshot(competitorUrl);
+            if (!shot.success) {
+                logger.error("Screenshot failed", { error: shot.error, code: shot.code });
+                metadata.set("status", "Failed");
+                return { success: false, error: shot.error };
+            }
+            const screenshot = shot.screenshot;
 
             logger.info(`Screenshot captured: ${screenshot.length} bytes`);
             metadata.set("screenshotSize", screenshot.length);
@@ -84,7 +77,7 @@ export const analyzeCompetitorTask = task({
                 contents: [{
                     role: "user",
                     parts: [
-                        { inlineData: { mimeType: "image/jpeg", data: base64Image } },
+                        { inlineData: { mimeType: shot.contentType, data: base64Image } },
                         { text: `Analyze this competitor comprehensively. Return JSON: companyName, tagline, pricing {plans[]}, features {highlighted[], differentiators[]}, positioning {targetAudience, valueProposition, socialProof[]}, insights[], summary.` }
                     ]
                 }],
@@ -162,7 +155,6 @@ export const analyzeCompetitorTask = task({
                 screenshotSize: screenshot.length,
             };
         } catch (error) {
-            if (browser) await (browser as any).close();
             logger.error("Analysis failed", { error });
             metadata.set("status", "Failed");
             return { success: false, error: error instanceof Error ? error.message : "Unknown error" };

@@ -1,29 +1,18 @@
-import { chromium, type Browser, type Page } from "playwright";
+import { getFirecrawlClient } from "./firecrawl";
+import { fetchScreenshotBuffer } from "./scrapePage";
 
 /**
- * Screenshot Capture Module
+ * Screenshot Capture Module (Firecrawl-hosted — P3b, Playwright removed)
  *
- * Captures full-page screenshots of competitor pages using Playwright.
+ * Captures full-page screenshots of competitor pages via Firecrawl.
  * Screenshots are then analyzed by Gemini vision for structured data extraction.
  */
-
-const TIMEOUT_MS = 30000;
-
-let browserInstance: Browser | null = null;
-
-async function getBrowser(): Promise<Browser> {
-    if (!browserInstance || !browserInstance.isConnected()) {
-        browserInstance = await chromium.launch({
-            headless: true,
-            args: ["--no-sandbox", "--disable-setuid-sandbox"],
-        });
-    }
-    return browserInstance;
-}
 
 export interface ScreenshotResult {
     success: true;
     screenshot: Buffer;
+    /** image/png or image/jpeg — Gemini needs the real mime type */
+    contentType: string;
     url: string;
     title: string;
     timestamp: string;
@@ -37,103 +26,47 @@ export interface ScreenshotError {
 
 export type ScreenshotResponse = ScreenshotResult | ScreenshotError;
 
+function sniffContentType(buf: Buffer): string {
+    if (buf.length > 2 && buf[0] === 0x89 && buf[1] === 0x50) return "image/png";
+    if (buf.length > 2 && buf[0] === 0xff && buf[1] === 0xd8) return "image/jpeg";
+    return "image/png";
+}
+
 /**
- * Capture a full-page screenshot of a URL
+ * Capture a full-page screenshot of a URL via Firecrawl
  */
 export async function captureScreenshot(url: string): Promise<ScreenshotResponse> {
-    let page: Page | null = null;
-
     try {
-        const browser = await getBrowser();
-        page = await browser.newPage();
-
-        // Set realistic viewport (pricing pages need width for full tables)
-        await page.setViewportSize({ width: 1440, height: 900 });
-
-        // Navigate with timeout
-        console.log(`[Screenshot] Navigating to: ${url}`);
-        await page.goto(url, {
-            timeout: TIMEOUT_MS,
-            waitUntil: "networkidle",
+        const firecrawl = getFirecrawlClient();
+        const doc = await firecrawl.scrape(url, {
+            formats: [{ type: "screenshot", fullPage: true }],
+            onlyMainContent: false,
+            timeout: 60000,
         });
 
-        // Wait for JS rendering
-        await page.waitForTimeout(3000);
+        if (!doc.screenshot) {
+            return { success: false, error: "Firecrawl returned no screenshot", code: "UNKNOWN" };
+        }
 
-        // Scroll to trigger lazy-loaded content
-        await page.evaluate(() => {
-            window.scrollTo(0, document.body.scrollHeight / 3);
-        });
-        await page.waitForTimeout(1000);
-
-        // Scroll back to top for screenshot
-        await page.evaluate(() => {
-            window.scrollTo(0, 0);
-        });
-        await page.waitForTimeout(500);
-
-        // Get page title
-        const title = await page.title();
-
-        // Capture full page screenshot (PNG for quality)
-        const screenshot = await page.screenshot({
-            type: "png",
-            fullPage: true,
-        });
-
-        await page.close();
-        page = null;
-
-        console.log(`[Screenshot] Captured ${screenshot.length} bytes`);
+        const screenshot = await fetchScreenshotBuffer(doc.screenshot);
+        console.log(`[Screenshot] Captured ${screenshot.length} bytes via Firecrawl`);
 
         return {
             success: true,
             screenshot,
+            contentType: sniffContentType(screenshot),
             url,
-            title,
+            title: doc.metadata?.title || "",
             timestamp: new Date().toISOString(),
         };
     } catch (error: unknown) {
-        if (page) {
-            await page.close().catch(() => { });
+        const message = error instanceof Error ? error.message : "Unknown error";
+        if (/timeout/i.test(message)) {
+            return { success: false, error: "Page load timed out", code: "TIMEOUT" };
         }
-
-        if (error instanceof Error) {
-            if (error.message.includes("Timeout")) {
-                return {
-                    success: false,
-                    error: "Page load timed out",
-                    code: "TIMEOUT",
-                };
-            }
-            if (error.message.includes("403") || error.message.includes("blocked")) {
-                return {
-                    success: false,
-                    error: "Page blocked our request",
-                    code: "BLOCKED",
-                };
-            }
-            return {
-                success: false,
-                error: error.message,
-                code: "UNKNOWN",
-            };
+        if (message.includes("403") || /blocked/i.test(message)) {
+            return { success: false, error: "Page blocked our request", code: "BLOCKED" };
         }
-
-        return {
-            success: false,
-            error: "Unknown error",
-            code: "UNKNOWN",
-        };
-    }
-}
-
-/**
- * Cleanup browser instance
- */
-export async function closeScreenshotBrowser(): Promise<void> {
-    if (browserInstance) {
-        await browserInstance.close();
-        browserInstance = null;
+        return { success: false, error: message, code: "UNKNOWN" };
     }
 }

@@ -1,216 +1,74 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// Use vi.hoisted to ensure mocks are available in the mock factory
-const { mockPage, mockBrowser } = vi.hoisted(() => {
-    const page = {
-        setViewportSize: vi.fn(),
-        goto: vi.fn(),
-        waitForTimeout: vi.fn(),
-        evaluate: vi.fn((fn, ...args) => {
-            if (typeof fn === 'function') return Promise.resolve(fn(...args));
-            return Promise.resolve();
-        }),
-        title: vi.fn(),
-        screenshot: vi.fn(),
-        close: vi.fn(),
-    }
-    const browser = {
-        isConnected: vi.fn(),
-        newPage: vi.fn(),
-        close: vi.fn(),
-    }
-    return { mockPage: page, mockBrowser: browser }
-})
+const { mockScrape } = vi.hoisted(() => ({ mockScrape: vi.fn() }));
 
-vi.mock('playwright', () => ({
-    chromium: {
-        launch: vi.fn().mockImplementation(() => Promise.resolve(mockBrowser))
-    }
-}))
+vi.mock("../firecrawl", () => ({
+    getFirecrawlClient: () => ({ scrape: mockScrape }),
+}));
 
-import { captureScreenshot, closeScreenshotBrowser } from '../screenshot'
-import { chromium } from 'playwright'
+import { captureScreenshot } from "../screenshot";
 
-describe('screenshot', () => {
-    beforeEach(() => {
-        vi.resetAllMocks()
+const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(8)]);
+const jpg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(8)]);
 
-        // Setup default behaviors
-        mockPage.setViewportSize.mockResolvedValue(undefined)
-        mockPage.goto.mockResolvedValue(undefined)
-        mockPage.waitForTimeout.mockResolvedValue(undefined)
-        mockPage.evaluate.mockResolvedValue(undefined)
-        mockPage.title.mockResolvedValue('Test Page Title')
-        mockPage.screenshot.mockResolvedValue(Buffer.from('fake-screenshot-data'))
-        mockPage.close.mockResolvedValue(undefined)
+function stubFetch(buf: Buffer) {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
+    }));
+}
 
-        mockBrowser.isConnected.mockReturnValue(true)
-        mockBrowser.newPage.mockResolvedValue(mockPage)
-        mockBrowser.close.mockResolvedValue(undefined)
+beforeEach(() => {
+    mockScrape.mockReset();
+    vi.spyOn(console, "log").mockImplementation(() => { });
+});
 
-        vi.mocked(chromium.launch).mockResolvedValue(mockBrowser as any)
+afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+});
 
-        vi.spyOn(console, 'log').mockImplementation(() => { })
-        vi.spyOn(console, 'error').mockImplementation(() => { })
+describe("captureScreenshot (Firecrawl)", () => {
+    it("returns buffer, sniffed content type, and page title", async () => {
+        mockScrape.mockResolvedValue({ screenshot: "https://fc.dev/shot.png", metadata: { title: "Acme Pricing" } });
+        stubFetch(png);
 
-        // Mock window.scrollTo for evaluate
-        if (typeof window !== 'undefined') {
-            window.scrollTo = vi.fn()
-        } else {
-            (global as any).window = { scrollTo: vi.fn(), document: { body: { scrollHeight: 1000 } } }
+        const res = await captureScreenshot("https://acme.com/pricing");
+
+        expect(res.success).toBe(true);
+        if (res.success) {
+            expect(Buffer.isBuffer(res.screenshot)).toBe(true);
+            expect(res.contentType).toBe("image/png");
+            expect(res.title).toBe("Acme Pricing");
+            expect(res.url).toBe("https://acme.com/pricing");
         }
-    })
+        expect(mockScrape.mock.calls[0][1].formats).toContainEqual({ type: "screenshot", fullPage: true });
+    });
 
-    afterEach(async () => {
-        await closeScreenshotBrowser()
-        vi.restoreAllMocks()
-    })
+    it("sniffs JPEG content type", async () => {
+        mockScrape.mockResolvedValue({ screenshot: "https://fc.dev/shot.jpg", metadata: {} });
+        stubFetch(jpg);
 
-    describe('captureScreenshot', () => {
-        it('successfully captures a screenshot', async () => {
-            mockPage.title.mockResolvedValue('Pricing Page')
-            mockPage.screenshot.mockResolvedValue(Buffer.from('png-data'))
+        const res = await captureScreenshot("https://acme.com");
+        expect(res.success && res.contentType).toBe("image/jpeg");
+    });
 
-            const result = await captureScreenshot('https://example.com/pricing')
+    it("fails when Firecrawl returns no screenshot", async () => {
+        mockScrape.mockResolvedValue({ metadata: {} });
+        const res = await captureScreenshot("https://acme.com");
+        expect(res.success).toBe(false);
+        if (!res.success) expect(res.code).toBe("UNKNOWN");
+    });
 
-            expect(result.success).toBe(true)
-            if (result.success) {
-                expect(result.url).toBe('https://example.com/pricing')
-                expect(result.title).toBe('Pricing Page')
-                expect(result.screenshot).toBeDefined()
-                expect(result.timestamp).toBeDefined()
-            }
-        })
+    it("maps timeout errors to TIMEOUT", async () => {
+        mockScrape.mockRejectedValue(new Error("Request timeout after 60000ms"));
+        const res = await captureScreenshot("https://acme.com");
+        expect(!res.success && res.code).toBe("TIMEOUT");
+    });
 
-        it('returns TIMEOUT error when page load times out', async () => {
-            mockPage.goto.mockRejectedValue(new Error('Timeout 30000ms exceeded'))
-
-            const result = await captureScreenshot('https://slow-site.com')
-
-            expect(result.success).toBe(false)
-            if (!result.success) {
-                expect(result.code).toBe('TIMEOUT')
-                expect(result.error).toBe('Page load timed out')
-            }
-        })
-
-        it('returns BLOCKED error when access is denied', async () => {
-            mockPage.goto.mockRejectedValue(new Error('403 Forbidden'))
-
-            const result = await captureScreenshot('https://blocked-site.com')
-
-            expect(result.success).toBe(false)
-            if (!result.success) {
-                expect(result.code).toBe('BLOCKED')
-                expect(result.error).toBe('Page blocked our request')
-            }
-        })
-
-        it('returns BLOCKED error when explicitly blocked', async () => {
-            mockPage.goto.mockRejectedValue(new Error('Access blocked by site'))
-
-            const result = await captureScreenshot('https://protected-site.com')
-
-            expect(result.success).toBe(false)
-            if (!result.success) {
-                expect(result.code).toBe('BLOCKED')
-            }
-        })
-
-        it('returns UNKNOWN error for generic errors', async () => {
-            mockPage.goto.mockRejectedValue(new Error('Network connection lost'))
-
-            const result = await captureScreenshot('https://example.com')
-
-            expect(result.success).toBe(false)
-            if (!result.success) {
-                expect(result.code).toBe('UNKNOWN')
-                expect(result.error).toBe('Network connection lost')
-            }
-        })
-
-        it('returns UNKNOWN error for non-Error exceptions', async () => {
-            mockPage.goto.mockRejectedValue('String error')
-
-            const result = await captureScreenshot('https://example.com')
-
-            expect(result.success).toBe(false)
-            if (!result.success) {
-                expect(result.code).toBe('UNKNOWN')
-                expect(result.error).toBe('Unknown error')
-            }
-        })
-
-        it('handles browser launch failure', async () => {
-            await closeScreenshotBrowser()
-            vi.mocked(chromium.launch).mockRejectedValueOnce(new Error('Failed to launch browser'))
-
-            const result = await captureScreenshot('https://example.com')
-
-            expect(result.success).toBe(false)
-            if (!result.success) {
-                expect(result.error).toBe('Failed to launch browser')
-            }
-        })
-
-        it('closes page on error', async () => {
-            mockPage.goto.mockRejectedValue(new Error('Test error'))
-
-            await captureScreenshot('https://example.com')
-
-            expect(mockPage.close).toHaveBeenCalled()
-        })
-
-        it('sets viewport to 1440x900', async () => {
-            await captureScreenshot('https://example.com')
-
-            expect(mockPage.setViewportSize).toHaveBeenCalledWith({
-                width: 1440,
-                height: 900,
-            })
-        })
-
-        it('uses networkidle wait strategy', async () => {
-            await captureScreenshot('https://example.com')
-
-            expect(mockPage.goto).toHaveBeenCalledWith('https://example.com', {
-                timeout: 30000,
-                waitUntil: 'networkidle',
-            })
-        })
-
-        it('scrolls page to trigger lazy loading', async () => {
-            await captureScreenshot('https://example.com')
-
-            // Should call evaluate for scrolling at least twice
-            expect(mockPage.evaluate).toHaveBeenCalled()
-        })
-
-        it('captures full page PNG screenshot', async () => {
-            await captureScreenshot('https://example.com')
-
-            expect(mockPage.screenshot).toHaveBeenCalledWith({
-                type: 'png',
-                fullPage: true,
-            })
-        })
-    })
-
-    describe('closeScreenshotBrowser', () => {
-        it('closes browser instance', async () => {
-            // First trigger a capture to create browser instance
-            await captureScreenshot('https://example.com')
-
-            await closeScreenshotBrowser()
-
-            // Should not throw
-        })
-
-        it('handles multiple close calls gracefully', async () => {
-            await closeScreenshotBrowser()
-            await closeScreenshotBrowser()
-
-            // Should not throw
-        })
-    })
-})
+    it("maps 403/blocked errors to BLOCKED", async () => {
+        mockScrape.mockRejectedValue(new Error("403 Forbidden"));
+        const res = await captureScreenshot("https://acme.com");
+        expect(!res.success && res.code).toBe("BLOCKED");
+    });
+});

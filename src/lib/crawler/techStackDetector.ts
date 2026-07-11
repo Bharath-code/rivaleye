@@ -1,5 +1,3 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
-
 /**
  * Tech Stack Detector Module
  *
@@ -73,7 +71,6 @@ interface TechSignature {
     patterns: {
         scripts?: RegExp[];
         meta?: RegExp[];
-        globals?: string[];
         html?: RegExp[];
         headers?: RegExp[];
     };
@@ -87,7 +84,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         patterns: {
             scripts: [/_next\/static/],
             meta: [/next-head-count/],
-            globals: ["__NEXT_DATA__"],
         },
     },
     {
@@ -95,7 +91,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "framework",
         patterns: {
             scripts: [/react\.production\.min\.js/, /react-dom/],
-            globals: ["__REACT_DEVTOOLS_GLOBAL_HOOK__"],
             html: [/data-reactroot/, /data-reactid/],
         },
     },
@@ -104,7 +99,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "framework",
         patterns: {
             scripts: [/vue\.min\.js/, /vue\.runtime/],
-            globals: ["__VUE__", "Vue"],
             html: [/data-v-[a-f0-9]+/],
         },
     },
@@ -121,7 +115,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "framework",
         patterns: {
             scripts: [/_nuxt\//],
-            globals: ["__NUXT__"],
         },
     },
     {
@@ -138,7 +131,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "analytics",
         patterns: {
             scripts: [/google-analytics\.com/, /googletagmanager\.com/, /gtag\//],
-            globals: ["ga", "gtag", "dataLayer"],
         },
     },
     {
@@ -146,7 +138,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "analytics",
         patterns: {
             scripts: [/cdn\.segment\.com/],
-            globals: ["analytics"],
         },
     },
     {
@@ -154,7 +145,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "analytics",
         patterns: {
             scripts: [/cdn\.mxpnl\.com/, /mixpanel/],
-            globals: ["mixpanel"],
         },
     },
     {
@@ -162,7 +152,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "analytics",
         patterns: {
             scripts: [/amplitude\.com/],
-            globals: ["amplitude"],
         },
     },
     {
@@ -170,7 +159,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "analytics",
         patterns: {
             scripts: [/static\.hotjar\.com/],
-            globals: ["hj"],
         },
     },
     {
@@ -178,7 +166,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "analytics",
         patterns: {
             scripts: [/posthog\.com/, /app\.posthog\.com/],
-            globals: ["posthog"],
         },
     },
 
@@ -188,7 +175,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "chat",
         patterns: {
             scripts: [/widget\.intercom\.io/],
-            globals: ["Intercom"],
         },
     },
     {
@@ -196,7 +182,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "chat",
         patterns: {
             scripts: [/drift\.com/],
-            globals: ["drift"],
         },
     },
     {
@@ -204,7 +189,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "marketing",
         patterns: {
             scripts: [/js\.hs-scripts\.com/, /hubspot\.com/],
-            globals: ["HubSpot", "_hsq"],
         },
     },
     {
@@ -212,7 +196,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "chat",
         patterns: {
             scripts: [/client\.crisp\.chat/],
-            globals: ["$crisp"],
         },
     },
 
@@ -222,7 +205,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "payment",
         patterns: {
             scripts: [/js\.stripe\.com/],
-            globals: ["Stripe"],
         },
     },
     {
@@ -230,7 +212,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "payment",
         patterns: {
             scripts: [/cdn\.paddle\.com/],
-            globals: ["Paddle"],
         },
     },
     {
@@ -238,7 +219,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "payment",
         patterns: {
             scripts: [/paypal\.com\/sdk/],
-            globals: ["paypal"],
         },
     },
 
@@ -305,7 +285,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "auth",
         patterns: {
             scripts: [/auth0\.com/],
-            globals: ["auth0"],
         },
     },
     {
@@ -313,7 +292,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "auth",
         patterns: {
             scripts: [/clerk\.com/],
-            globals: ["Clerk"],
         },
     },
 
@@ -323,7 +301,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "monitoring",
         patterns: {
             scripts: [/sentry\.io/, /browser\.sentry-cdn\.com/],
-            globals: ["Sentry"],
         },
     },
     {
@@ -331,7 +308,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "monitoring",
         patterns: {
             scripts: [/logrocket/],
-            globals: ["LogRocket"],
         },
     },
     {
@@ -339,7 +315,6 @@ const TECH_SIGNATURES: TechSignature[] = [
         category: "monitoring",
         patterns: {
             scripts: [/datadoghq\.com/],
-            globals: ["DD_RUM"],
         },
     },
 
@@ -362,71 +337,50 @@ const TECH_SIGNATURES: TechSignature[] = [
 ];
 
 // ──────────────────────────────────────────────────────────────────────────────
-// BROWSER MANAGEMENT
-// ──────────────────────────────────────────────────────────────────────────────
-
-let browserInstance: Browser | null = null;
-
-async function getBrowser(): Promise<Browser> {
-    if (!browserInstance || !browserInstance.isConnected()) {
-        browserInstance = await chromium.launch({
-            headless: true,
-            args: ["--no-sandbox", "--disable-setuid-sandbox"],
-        });
-    }
-    return browserInstance;
-}
-
-export async function closeTechStackBrowser(): Promise<void> {
-    if (browserInstance) {
-        await browserInstance.close();
-        browserInstance = null;
-    }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
 // MAIN DETECTION FUNCTION
 // ──────────────────────────────────────────────────────────────────────────────
 
+/** Pull <script src> URLs out of rendered HTML (replaces Playwright network capture). */
+function extractScriptSrcs(html: string): string[] {
+    const srcs: string[] = [];
+    const re = /<script[^>]*\ssrc=["']([^"']+)["']/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html)) !== null) srcs.push(m[1]);
+    return srcs;
+}
+
+/** Response headers via plain fetch — keeps header signatures (cf-ray, x-vercel, …) without a browser. */
+async function fetchHeaders(url: string): Promise<Record<string, string>> {
+    try {
+        const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(15000) });
+        res.body?.cancel().catch(() => { });
+        return Object.fromEntries(res.headers.entries());
+    } catch {
+        return {};
+    }
+}
+
 /**
  * Detect tech stack used by a competitor website.
+ *
+ * P3b: Firecrawl-rendered HTML + a plain fetch for headers. Runtime `window`
+ * globals are no longer inspectable (browserless) — script/html/meta/header
+ * signatures carry detection.
  */
 export async function detectTechStack(url: string): Promise<TechStackResponse> {
-    let context: BrowserContext | null = null;
-    let page: Page | null = null;
-
     try {
-        const browser = await getBrowser();
-        context = await browser.newContext();
-        page = await context.newPage();
+        const { getFirecrawlClient } = await import("./firecrawl");
+        const [doc, headers] = await Promise.all([
+            getFirecrawlClient().scrape(url, {
+                formats: ["html"],
+                onlyMainContent: false,
+                timeout: 30000,
+            }),
+            fetchHeaders(url),
+        ]);
 
-        // Capture network requests for script detection
-        const scripts: string[] = [];
-        page.on("request", (request) => {
-            if (request.resourceType() === "script") {
-                scripts.push(request.url());
-            }
-        });
-
-        // Navigate
-        const response = await page.goto(url, {
-            timeout: 30000,
-            waitUntil: "domcontentloaded",
-        });
-
-        // Wait for JS to load
-        await page.waitForTimeout(3000);
-
-        // Get response headers
-        const headers = response?.headers() || {};
-
-        // Get HTML content
-        const html = await page.content();
-
-        // Get global variables
-        const globals = await page.evaluate(() => {
-            return Object.keys(window);
-        });
+        const html = doc.html || "";
+        const scripts = extractScriptSrcs(html);
 
         // Detect technologies
         const detected: DetectedTech[] = [];
@@ -460,15 +414,6 @@ export async function detectTechStack(url: string): Promise<TechStackResponse> {
                 }
             }
 
-            // Check globals
-            if (sig.patterns.globals) {
-                for (const g of sig.patterns.globals) {
-                    if (globals.includes(g)) {
-                        matches.push(`Global: ${g}`);
-                    }
-                }
-            }
-
             // Check headers
             if (sig.patterns.headers) {
                 for (const pattern of sig.patterns.headers) {
@@ -490,10 +435,6 @@ export async function detectTechStack(url: string): Promise<TechStackResponse> {
             }
         }
 
-        // Cleanup
-        await page.close();
-        await context.close();
-
         // Build summary
         const summary = buildSummary(detected);
 
@@ -504,12 +445,9 @@ export async function detectTechStack(url: string): Promise<TechStackResponse> {
             extractedAt: new Date().toISOString(),
         };
     } catch (error) {
-        if (page) await page.close().catch(() => { });
-        if (context) await context.close().catch(() => { });
-
         const message = error instanceof Error ? error.message : "Unknown error";
 
-        if (message.includes("Timeout")) {
+        if (/timeout/i.test(message)) {
             return { success: false, error: "Page load timed out", code: "TIMEOUT" };
         }
         if (message.includes("403") || message.includes("blocked")) {
