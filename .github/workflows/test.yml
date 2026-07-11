@@ -6,6 +6,18 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled]
+  # Manual trigger for the (expensive, live-network) shadow-parity gate.
+  workflow_dispatch:
+    inputs:
+      shadow_urls:
+        description: Comma-separated pricing URLs to shadow-compare
+        required: false
+        default: "https://vercel.com/pricing,https://linear.app/pricing,https://slack.com/pricing,https://zapier.com/pricing,https://buffer.com/pricing"
+      shadow_strict:
+        description: Fail the run on any Firecrawl-vs-Playwright divergence
+        required: false
+        default: "1"
 
 # Cancel superseded runs on the same branch (saves CI minutes)
 concurrency:
@@ -184,6 +196,50 @@ jobs:
       #     path: .next/
       #     retention-days: 7
 
+  # ═══════════════════════════════════════════════════════════════════════════
+  # LIVE EXTRACTION SMOKE — Firecrawl extractor against LIVE pricing pages.
+  # (Was the P3 shadow-parity gate; the Playwright control path is deleted.)
+  #
+  # Opt-in ONLY (real Firecrawl credits + live network, and it's flaky by
+  # nature): runs on manual dispatch, or on a PR labeled "ci:shadow-parity".
+  # Never on normal pushes/PRs.
+  # Requires repo secret FIRECRAWL_API_KEY.
+  # ═══════════════════════════════════════════════════════════════════════════
+  shadow-parity:
+    name: Live Firecrawl Extraction Smoke
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'ci:shadow-parity')
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder_anon_key_for_ci
+      SUPABASE_SERVICE_ROLE_KEY: placeholder_service_role_key_for_ci
+      FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+      # Untrusted-input-safe: dispatch inputs flow through env, never inlined
+      # into run:. Fall back to a stable default URL set for label-triggered runs.
+      SHADOW_URLS: ${{ github.event.inputs.shadow_urls || 'https://vercel.com/pricing,https://linear.app/pricing,https://slack.com/pricing,https://zapier.com/pricing,https://buffer.com/pricing' }}
+      SHADOW_STRICT: ${{ github.event.inputs.shadow_strict || '1' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Guard — FIRECRAWL_API_KEY must be configured
+        run: |
+          if [ -z "$FIRECRAWL_API_KEY" ]; then
+            echo "::error::FIRECRAWL_API_KEY secret is not set — add it in repo Settings → Secrets → Actions."
+            exit 1
+          fi
+
+      - name: Run live extraction smoke
+        run: npx vitest run scripts/shadow-parity.test.ts
+
 # ═══════════════════════════════════════════════════════════════════════════
 # All 4 jobs must pass to merge (enforce via branch protection in GitHub UI)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -195,3 +251,7 @@ jobs:
 #   ☑ Do not allow force pushes
 #   ☑ Do not allow deletions
 # See docs/CI_SETUP.md for the full walkthrough.
+#
+# NOTE: the live extraction smoke is intentionally NOT a required check —
+# it's opt-in (label a PR "ci:shadow-parity" or run via workflow_dispatch).
+# Needs repo secret FIRECRAWL_API_KEY.

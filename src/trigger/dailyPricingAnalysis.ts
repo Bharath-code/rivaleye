@@ -152,7 +152,6 @@ export const dailyPricingAnalysis = schedules.task({
                     competitorName: work.competitorName,
                     userId: work.userId,
                     context: work.context,
-                    bestScraper: work.bestScraper,
                 });
 
                 if (result.ok) {
@@ -251,7 +250,6 @@ interface WorkItem {
     competitorName: string;
     userId: string;
     context: PricingContext;
-    bestScraper: "firecrawl" | "playwright" | null;
 }
 
 async function buildWorkQueue(
@@ -283,7 +281,6 @@ async function buildWorkQueue(
                     competitorName: competitor.name,
                     userId: competitor.user_id,
                     context,
-                    bestScraper: (competitor.best_scraper as "firecrawl" | "playwright") || null,
                 });
             }
         }
@@ -385,7 +382,6 @@ export async function triggerManualCheck(
             competitorName: competitor.name,
             userId: competitor.user_id,
             context,
-            bestScraper: competitor.best_scraper as "firecrawl" | "playwright" | null,
         });
         triggeredKeys.push(context.key);
     }
