@@ -30,9 +30,9 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
-      any: ${{ steps.filter.outputs.any }}
+      backend: ${{ steps.set-outputs.outputs.backend }}
+      frontend: ${{ steps.set-outputs.outputs.frontend }}
+      any: ${{ steps.set-outputs.outputs.any }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -54,7 +54,7 @@ jobs:
           # most files affect both, this is just an optimization signal.
       - id: set-outputs
         run: |
-          if [ -n "${{ steps.filter.outputs.files }}" ]; then
+          if [ -n "${{ steps.filter.outputs.all_changed_files }}" ]; then
             echo "any=changed" >> "$GITHUB_OUTPUT"
             echo "backend=changed" >> "$GITHUB_OUTPUT"
             echo "frontend=changed" >> "$GITHUB_OUTPUT"
