@@ -262,10 +262,12 @@ function checkPromotionChanges(
     after: PricingSchema,
     diffs: DetectedDiff[]
 ): void {
-    // Check if highlighted plan changed
+    // Check if highlighted plan changed. highlighted_plan is a plan NAME in the
+    // AI/Firecrawl path (analyze-competitor route) and a plan id in the
+    // Playwright path (geoPlaywright); match on either so both producers work.
     if (before.highlighted_plan !== after.highlighted_plan) {
-        const beforePlan = before.plans.find((p) => p.id === before.highlighted_plan);
-        const afterPlan = after.plans.find((p) => p.id === after.highlighted_plan);
+        const beforePlan = findHighlightedPlan(before.plans, before.highlighted_plan);
+        const afterPlan = findHighlightedPlan(after.plans, after.highlighted_plan);
 
         if (beforePlan || afterPlan) {
             diffs.push({
@@ -295,6 +297,15 @@ function normalizeCta(cta: string): string {
 function findMatchingPlan(plans: PricingPlan[], name: string): PricingPlan | undefined {
     const normalizedName = normalizePlanName(name);
     return plans.find((p) => normalizePlanName(p.name) === normalizedName);
+}
+
+function findHighlightedPlan(
+    plans: PricingPlan[],
+    ref: string | null
+): PricingPlan | undefined {
+    if (!ref) return undefined;
+    const normalizedRef = normalizePlanName(ref);
+    return plans.find((p) => p.id === ref || normalizePlanName(p.name) === normalizedRef);
 }
 
 function formatPlanSummary(plan: PricingPlan): string {

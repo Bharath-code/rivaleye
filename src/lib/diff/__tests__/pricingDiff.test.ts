@@ -183,6 +183,28 @@ describe('pricingDiff', () => {
                 const promotedDiff = result.diffs.find(d => d.type === 'plan_promoted')
                 expect(promotedDiff).toBeDefined()
             })
+
+            it('detects promotion when highlighted_plan holds a plan name (AI/Firecrawl path)', () => {
+                const before = createMockSchema({
+                    plans: [
+                        createMockPlan({ id: 'plan-0', name: 'Basic' }),
+                        createMockPlan({ id: 'plan-1', name: 'Pro' }),
+                    ],
+                    highlighted_plan: 'Basic',
+                })
+                const after = createMockSchema({
+                    plans: [
+                        createMockPlan({ id: 'plan-0', name: 'Basic' }),
+                        createMockPlan({ id: 'plan-1', name: 'Pro' }),
+                    ],
+                    highlighted_plan: 'Pro',
+                })
+                const result = diffPricing(before, after)
+                const promotedDiff = result.diffs.find(d => d.type === 'plan_promoted')
+                expect(promotedDiff).toBeDefined()
+                expect(promotedDiff?.before).toBe('Basic')
+                expect(promotedDiff?.after).toBe('Pro')
+            })
         })
 
         describe('overall severity calculation', () => {
