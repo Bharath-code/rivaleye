@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { analytics } from "@/components/providers/AnalyticsProvider";
 import { useRealtimeAlerts } from "@/hooks/useRealtimeAlerts";
+import { useRealtimeCompetitors } from "@/hooks/useRealtimeCompetitors";
 
 /**
  * useDashboardData — Centralized data hook for the dashboard.
@@ -180,6 +181,21 @@ export function useDashboardData(): DashboardData {
             },
             []
         ),
+    });
+
+    // Real-time: when the first-scan crawl finishes (last_checked_at set,
+    // status/failure_count updated), flip the card out of "scanning" (UX-1)
+    // without a refetch.
+    useRealtimeCompetitors({
+        competitorIds: competitors.map((c) => c.id),
+        enabled: !isLoading && competitors.length > 0,
+        onUpdate: useCallback((updated: Record<string, unknown>) => {
+            setCompetitors((prev) =>
+                prev.map((c) =>
+                    c.id === updated.id ? { ...c, ...(updated as Partial<Competitor>) } : c
+                )
+            );
+        }, []),
     });
 
     return {

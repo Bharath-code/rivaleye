@@ -140,7 +140,7 @@ export function CompetitorCard({
                     {isFirstScanPending ? (
                         <span className="flex items-center gap-1.5 text-emerald-400">
                             <Loader2 className="w-3 h-3 animate-spin" />
-                            Running first scan…
+                            Running first scan… (usually ~1-2 min)
                         </span>
                     ) : (
                         <span className="flex items-center gap-1">
