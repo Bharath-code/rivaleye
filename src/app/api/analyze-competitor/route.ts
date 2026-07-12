@@ -244,7 +244,7 @@ export async function POST(request: Request) {
             await supabase.from("pricing_snapshots").insert({
                 competitor_id: competitorId,
                 pricing_context_id: contextId,
-                source: "playwright",
+                source: "firecrawl",
                 currency_detected: pricingSchema.currency,
                 pricing_schema: pricingSchema,
                 dom_hash: currentHash,

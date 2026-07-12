@@ -177,9 +177,16 @@ Each phase is independently shippable and guarded so it can land without a big-b
   `uploadScreenshot` now sniffs PNG/JPEG magic bytes instead of mislabeling everything
   `image/webp`. KEPT `playwright` dep, `screenshot.ts`, and the Trigger extension (survivors
   still need them).
-- **P3b (separate project)** — migrate the five Playwright consumers (accepting the techStack
-  detection tradeoff or sourcing headers another way), THEN remove the `playwright` dep + Trigger
-  build extension.
+- **P3b — DONE (2026-07-11).** Playwright fully removed. `screenshot.ts` rewritten on Firecrawl
+  (full-page screenshot format + `fetchScreenshotBuffer`, returns sniffed `contentType` for
+  Gemini). `techStackDetector` now uses Firecrawl-rendered HTML (`formats: ["html"]`, script srcs
+  parsed from markup) + a plain `fetch` for response headers — header signatures (cf-ray,
+  x-vercel, x-nf, x-amz-cf) survive; only `window` globals signatures were dropped (accepted
+  tradeoff). `performanceInsights.ts` deleted outright — it had zero callers (deepAudit already
+  uses Google PageSpeed Insights). `analyzeCompetitor` + `dailyAnalysis` inline chromium blocks
+  replaced with `captureScreenshot()`. Removed: `playwright` + `@trigger.dev/build` deps and the
+  Trigger.dev playwright build extension. `pricing_snapshots.source` now written as "firecrawl"
+  everywhere (old rows keep "playwright"; the type union keeps both for reads).
 
 ---
 

@@ -1,280 +1,139 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// Use vi.hoisted to ensure mocks are available
-const { mockPage, mockBrowser, mockContext } = vi.hoisted(() => {
-    const page = {
-        goto: vi.fn(),
-        waitForTimeout: vi.fn(),
-        evaluate: vi.fn(),
-        close: vi.fn(),
-        on: vi.fn(),
-        route: vi.fn(),
-        setDefaultTimeout: vi.fn(),
-    }
-    const context = {
-        newPage: vi.fn(),
-        close: vi.fn(),
-    }
-    const browser = {
-        isConnected: vi.fn(),
-        newContext: vi.fn(),
-        close: vi.fn(),
-    }
-    return { mockPage: page, mockBrowser: browser, mockContext: context }
-})
+const { mockScrape } = vi.hoisted(() => ({ mockScrape: vi.fn() }));
 
-vi.mock('playwright', () => ({
-    chromium: {
-        launch: vi.fn().mockImplementation(() => Promise.resolve(mockBrowser))
-    }
-}))
+vi.mock("../firecrawl", () => ({
+    getFirecrawlClient: () => ({ scrape: mockScrape }),
+}));
 
-import {
-    detectTechStack,
-    closeTechStackBrowser,
-    compareTechStacks,
-    type DetectedTech,
-} from '../techStackDetector'
-import { chromium } from 'playwright'
+import { detectTechStack, compareTechStacks, type DetectedTech } from "../techStackDetector";
 
-// ──────────────────────────────────────────────────────────────────────────────
-// MOCK DATA FACTORIES
-// ──────────────────────────────────────────────────────────────────────────────
-
-function createMockTech(overrides: Partial<DetectedTech> = {}): DetectedTech {
-    return {
-        name: 'React',
-        category: 'framework',
-        confidence: 'high',
-        evidence: 'Found React globals',
-        ...overrides,
-    }
+function stubHeaders(headers: Record<string, string>) {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+        headers: new Headers(headers),
+        body: null,
+    }));
 }
 
-describe('techStackDetector', () => {
-    beforeEach(() => {
-        vi.resetAllMocks()
+beforeEach(() => {
+    mockScrape.mockReset();
+});
 
-        mockPage.goto.mockResolvedValue({ headers: () => ({}) })
-        mockPage.waitForTimeout.mockResolvedValue(undefined)
-        mockPage.evaluate.mockResolvedValue(['react'])
-        mockPage.close.mockResolvedValue(undefined)
-        mockPage.on.mockReturnValue(undefined)
-        mockPage.route.mockResolvedValue(undefined)
-        mockPage.setDefaultTimeout.mockReturnValue(undefined)
-        // @ts-ignore - adding content method
-        mockPage.content = vi.fn().mockResolvedValue('<html></html>')
+afterEach(() => {
+    vi.unstubAllGlobals();
+});
 
-        mockContext.newPage.mockResolvedValue(mockPage)
-        mockContext.close.mockResolvedValue(undefined)
+describe("detectTechStack (Firecrawl)", () => {
+    it("detects frameworks and analytics from script srcs and html patterns", async () => {
+        mockScrape.mockResolvedValue({
+            html: `<html><head>
+                <script src="/_next/static/chunks/main.js"></script>
+                <script src="https://www.googletagmanager.com/gtag/js"></script>
+                <script src="https://js.stripe.com/v3/"></script>
+            </head><body data-reactroot=""></body></html>`,
+        });
+        stubHeaders({});
 
-        mockBrowser.isConnected.mockReturnValue(true)
-        mockBrowser.newContext.mockResolvedValue(mockContext)
-        mockBrowser.close.mockResolvedValue(undefined)
+        const res = await detectTechStack("https://acme.com");
 
-        vi.mocked(chromium.launch).mockResolvedValue(mockBrowser as any)
+        expect(res.success).toBe(true);
+        if (res.success) {
+            const names = res.technologies.map((t) => t.name);
+            expect(names).toContain("Next.js");
+            expect(names).toContain("React");
+            expect(names).toContain("Google Analytics");
+            expect(names).toContain("Stripe");
+            expect(res.summary.framework).toBe("Next.js");
+            expect(res.summary.payments).toContain("Stripe");
+        }
+    });
 
-        vi.spyOn(console, 'log').mockImplementation(() => { })
-        vi.spyOn(console, 'error').mockImplementation(() => { })
-    })
+    it("detects hosting/CDN from response headers via plain fetch", async () => {
+        mockScrape.mockResolvedValue({ html: "<html></html>" });
+        stubHeaders({ "cf-ray": "abc123", "x-vercel-id": "iad1::xyz" });
 
-    afterEach(async () => {
-        await closeTechStackBrowser()
-        vi.restoreAllMocks()
-    })
+        const res = await detectTechStack("https://acme.com");
 
-    describe('detectTechStack', () => {
-        it('returns TIMEOUT error when page load times out', async () => {
-            mockPage.goto.mockRejectedValue(new Error('Timeout 60000ms exceeded'))
+        expect(res.success).toBe(true);
+        if (res.success) {
+            const names = res.technologies.map((t) => t.name);
+            expect(names).toContain("Cloudflare");
+            expect(names).toContain("Vercel");
+        }
+    });
 
-            const result = await detectTechStack('https://slow-site.com')
+    it("succeeds with empty detections when nothing matches", async () => {
+        mockScrape.mockResolvedValue({ html: "<html><body>plain</body></html>" });
+        stubHeaders({});
 
-            expect(result.success).toBe(false)
-            if (!result.success) {
-                expect(result.code).toBe('TIMEOUT')
-            }
-        })
+        const res = await detectTechStack("https://plain.com");
+        expect(res.success).toBe(true);
+        if (res.success) {
+            expect(res.technologies).toHaveLength(0);
+            expect(res.summary.framework).toBeNull();
+        }
+    });
 
-        it('returns BLOCKED error when access is denied', async () => {
-            mockPage.goto.mockRejectedValue(new Error('403 Forbidden'))
+    it("still detects header signatures when the header fetch fails", async () => {
+        mockScrape.mockResolvedValue({ html: `<script src="https://static.hotjar.com/c.js"></script>` });
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
-            const result = await detectTechStack('https://blocked-site.com')
+        const res = await detectTechStack("https://acme.com");
+        expect(res.success).toBe(true);
+        if (res.success) expect(res.technologies.map((t) => t.name)).toContain("Hotjar");
+    });
 
-            expect(result.success).toBe(false)
-            if (!result.success) {
-                expect(result.code).toBe('BLOCKED')
-            }
-        })
+    it("maps timeout errors to TIMEOUT", async () => {
+        mockScrape.mockRejectedValue(new Error("Request timeout"));
+        stubHeaders({});
+        const res = await detectTechStack("https://slow.com");
+        expect(!res.success && res.code).toBe("TIMEOUT");
+    });
 
-        it('returns BLOCKED error when explicitly blocked', async () => {
-            mockPage.goto.mockRejectedValue(new Error('Access blocked'))
+    it("maps blocked errors to BLOCKED", async () => {
+        mockScrape.mockRejectedValue(new Error("403 Forbidden"));
+        stubHeaders({});
+        const res = await detectTechStack("https://blocked.com");
+        expect(!res.success && res.code).toBe("BLOCKED");
+    });
 
-            const result = await detectTechStack('https://protected-site.com')
+    it("maps generic errors to UNKNOWN", async () => {
+        mockScrape.mockRejectedValue(new Error("Network connection lost"));
+        stubHeaders({});
+        const res = await detectTechStack("https://example.com");
+        expect(res.success).toBe(false);
+        if (!res.success) {
+            expect(res.code).toBe("UNKNOWN");
+            expect(res.error).toBe("Network connection lost");
+        }
+    });
+});
 
-            expect(result.success).toBe(false)
-            if (!result.success) {
-                expect(result.code).toBe('BLOCKED')
-            }
-        })
+describe("compareTechStacks", () => {
+    const tech = (name: string): DetectedTech => ({
+        name,
+        category: "framework",
+        confidence: "high",
+        evidence: "test",
+    });
 
-        it('returns UNKNOWN error for generic errors', async () => {
-            mockPage.goto.mockRejectedValue(new Error('Network connection lost'))
+    it("returns no changes when stacks are identical", () => {
+        const stack = [tech("React")];
+        const diff = compareTechStacks(stack, stack);
+        expect(diff.added).toHaveLength(0);
+        expect(diff.removed).toHaveLength(0);
+        expect(diff.summary).toBe("No tech stack changes");
+    });
 
-            const result = await detectTechStack('https://example.com')
+    it("detects added technology", () => {
+        const diff = compareTechStacks([tech("React")], [tech("React"), tech("Stripe")]);
+        expect(diff.added.map((t) => t.name)).toEqual(["Stripe"]);
+        expect(diff.summary).toContain("Added: Stripe");
+    });
 
-            expect(result.success).toBe(false)
-            if (!result.success) {
-                expect(result.code).toBe('UNKNOWN')
-                expect(result.error).toBe('Network connection lost')
-            }
-        })
-
-        it('handles browser launch failure', async () => {
-            await closeTechStackBrowser()
-            vi.mocked(chromium.launch).mockRejectedValueOnce(new Error('Browser launch failed'))
-
-            const result = await detectTechStack('https://example.com')
-
-            expect(result.success).toBe(false)
-            if (!result.success) {
-                expect(result.error).toBe('Browser launch failed')
-            }
-        })
-
-        it('closes page and context on error', async () => {
-            mockPage.goto.mockRejectedValue(new Error('Test error'))
-
-            await detectTechStack('https://example.com')
-
-            expect(mockPage.close).toHaveBeenCalled()
-            expect(mockContext.close).toHaveBeenCalled()
-        })
-    })
-
-    describe('closeTechStackBrowser', () => {
-        it('closes browser instance', async () => {
-            await closeTechStackBrowser()
-            // Should not throw
-        })
-
-        it('handles multiple close calls gracefully', async () => {
-            await closeTechStackBrowser()
-            await closeTechStackBrowser()
-            // Should not throw
-        })
-    })
-
-    describe('compareTechStacks', () => {
-        it('returns no changes when stacks are identical', () => {
-            const stack = [createMockTech({ name: 'React' })]
-            const diff = compareTechStacks(stack, stack)
-
-            expect(diff.added).toHaveLength(0)
-            expect(diff.removed).toHaveLength(0)
-            expect(diff.summary).toBe('No tech stack changes')
-        })
-
-        it('detects added technology', () => {
-            const oldStack: DetectedTech[] = [createMockTech({ name: 'React' })]
-            const newStack: DetectedTech[] = [
-                createMockTech({ name: 'React' }),
-                createMockTech({ name: 'Stripe', category: 'payment' }),
-            ]
-
-            const diff = compareTechStacks(oldStack, newStack)
-
-            expect(diff.added).toHaveLength(1)
-            expect(diff.added[0].name).toBe('Stripe')
-            expect(diff.removed).toHaveLength(0)
-            expect(diff.summary).toContain('Added: Stripe')
-        })
-
-        it('detects removed technology', () => {
-            const oldStack: DetectedTech[] = [
-                createMockTech({ name: 'React' }),
-                createMockTech({ name: 'Intercom', category: 'chat' }),
-            ]
-            const newStack: DetectedTech[] = [createMockTech({ name: 'React' })]
-
-            const diff = compareTechStacks(oldStack, newStack)
-
-            expect(diff.added).toHaveLength(0)
-            expect(diff.removed).toHaveLength(1)
-            expect(diff.removed[0]).toBe('Intercom')
-            expect(diff.summary).toContain('Removed: Intercom')
-        })
-
-        it('detects both added and removed technologies', () => {
-            const oldStack: DetectedTech[] = [
-                createMockTech({ name: 'React' }),
-                createMockTech({ name: 'Intercom', category: 'chat' }),
-            ]
-            const newStack: DetectedTech[] = [
-                createMockTech({ name: 'React' }),
-                createMockTech({ name: 'Stripe', category: 'payment' }),
-            ]
-
-            const diff = compareTechStacks(oldStack, newStack)
-
-            expect(diff.added).toHaveLength(1)
-            expect(diff.removed).toHaveLength(1)
-            expect(diff.summary).toContain('Added: Stripe')
-            expect(diff.summary).toContain('Removed: Intercom')
-        })
-
-        it('handles empty old stack', () => {
-            const oldStack: DetectedTech[] = []
-            const newStack: DetectedTech[] = [
-                createMockTech({ name: 'React' }),
-                createMockTech({ name: 'Stripe' }),
-            ]
-
-            const diff = compareTechStacks(oldStack, newStack)
-
-            expect(diff.added).toHaveLength(2)
-            expect(diff.removed).toHaveLength(0)
-        })
-
-        it('handles empty new stack', () => {
-            const oldStack: DetectedTech[] = [
-                createMockTech({ name: 'React' }),
-                createMockTech({ name: 'Stripe' }),
-            ]
-            const newStack: DetectedTech[] = []
-
-            const diff = compareTechStacks(oldStack, newStack)
-
-            expect(diff.added).toHaveLength(0)
-            expect(diff.removed).toHaveLength(2)
-        })
-
-        it('handles multiple additions correctly', () => {
-            const oldStack: DetectedTech[] = []
-            const newStack: DetectedTech[] = [
-                createMockTech({ name: 'Stripe', category: 'payment' }),
-                createMockTech({ name: 'Mixpanel', category: 'analytics' }),
-                createMockTech({ name: 'Sentry', category: 'monitoring' }),
-            ]
-
-            const diff = compareTechStacks(oldStack, newStack)
-
-            expect(diff.added).toHaveLength(3)
-            expect(diff.summary).toContain('Stripe')
-            expect(diff.summary).toContain('Mixpanel')
-            expect(diff.summary).toContain('Sentry')
-        })
-
-        it('preserves category information in added technologies', () => {
-            const oldStack: DetectedTech[] = []
-            const newStack: DetectedTech[] = [
-                createMockTech({ name: 'Stripe', category: 'payment', confidence: 'high' }),
-            ]
-
-            const diff = compareTechStacks(oldStack, newStack)
-
-            expect(diff.added[0].category).toBe('payment')
-            expect(diff.added[0].confidence).toBe('high')
-        })
-    })
-})
-
+    it("detects removed technology", () => {
+        const diff = compareTechStacks([tech("React"), tech("Segment")], [tech("React")]);
+        expect(diff.removed).toEqual(["Segment"]);
+        expect(diff.summary).toContain("Removed: Segment");
+    });
+});

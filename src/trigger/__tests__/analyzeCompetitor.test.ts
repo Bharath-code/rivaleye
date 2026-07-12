@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted to ensure mocks are available for the dynamic imports and the task definition
-const { mockSupabase, mockAI, mockPage, mockBrowser } = vi.hoisted(() => {
+const { mockSupabase, mockAI, mockCapture } = vi.hoisted(() => {
     return {
         mockSupabase: {
             from: vi.fn().mockReturnThis(),
@@ -15,31 +15,10 @@ const { mockSupabase, mockAI, mockPage, mockBrowser } = vi.hoisted(() => {
         },
         mockAI: {
             models: {
-                generateContent: vi.fn().mockResolvedValue({
-                    text: JSON.stringify({
-                        companyName: 'TestCo',
-                        pricing: { plans: [{ name: 'Pro', price: '$10' }] },
-                        features: { highlighted: ['F1'], differentiators: [] },
-                        positioning: { socialProof: [] },
-                        insights: [],
-                        summary: 'Test summary'
-                    })
-                }),
+                generateContent: vi.fn(),
             },
         },
-        mockPage: {
-            setViewportSize: vi.fn().mockResolvedValue(undefined),
-            goto: vi.fn().mockResolvedValue(undefined),
-            waitForTimeout: vi.fn().mockResolvedValue(undefined),
-            evaluate: vi.fn().mockResolvedValue(undefined),
-            screenshot: vi.fn().mockResolvedValue(Buffer.from('fake-screenshot')),
-            title: vi.fn().mockResolvedValue('Test Title'),
-            close: vi.fn().mockResolvedValue(undefined),
-        },
-        mockBrowser: {
-            newPage: vi.fn(),
-            close: vi.fn().mockResolvedValue(undefined),
-        }
+        mockCapture: vi.fn(),
     };
 });
 
@@ -68,11 +47,8 @@ vi.mock('@google/genai', () => ({
     }),
 }));
 
-// Mock Playwright
-vi.mock('playwright', () => ({
-    chromium: {
-        launch: vi.fn().mockResolvedValue(mockBrowser),
-    },
+vi.mock('@/lib/crawler/screenshot', () => ({
+    captureScreenshot: mockCapture,
 }));
 
 import { analyzeCompetitorTask } from '../analyzeCompetitor';
@@ -89,8 +65,14 @@ describe('analyzeCompetitorTask', () => {
         vi.clearAllMocks();
 
         // Reset implementations to default
-        mockBrowser.newPage.mockResolvedValue(mockPage);
-        mockPage.goto.mockResolvedValue(undefined);
+        mockCapture.mockResolvedValue({
+            success: true,
+            screenshot: Buffer.from('fake-screenshot'),
+            contentType: 'image/png',
+            url: payload.competitorUrl,
+            title: 'Test Title',
+            timestamp: new Date().toISOString(),
+        });
         mockAI.models.generateContent.mockResolvedValue({
             text: JSON.stringify({
                 companyName: 'TestCo',
@@ -116,6 +98,13 @@ describe('analyzeCompetitorTask', () => {
 
         expect(result.success).toBe(true);
         expect(result.analysis.companyName).toBe('TestCo');
+        expect(mockCapture).toHaveBeenCalledWith(payload.competitorUrl);
+    });
+
+    it('passes the sniffed content type to Gemini', async () => {
+        await (analyzeCompetitorTask as any).run(payload);
+        const parts = mockAI.models.generateContent.mock.calls[0][0].contents[0].parts;
+        expect(parts[0].inlineData.mimeType).toBe('image/png');
     });
 
     it('handles analysis with missing pricing or features (hits hash fallback)', async () => {
@@ -132,14 +121,28 @@ describe('analyzeCompetitorTask', () => {
     });
 
     it('detects no changes when hashes match', async () => {
-        // Mock previous analysis with the correct hash for our mock data
-        // Hash for { pricing: [{name: 'Pro', price: '$10'}], features: ['F1'], positioning: undefined }
-        // Let's just run it once to see what hash it generates or use a known one.
-        // Actually, the current hash in the test might be stale if I changed the data.
-        const result1 = await (analyzeCompetitorTask as any).run(payload);
+        await (analyzeCompetitorTask as any).run(payload);
         const hash = (mockSupabase.insert.mock.calls[0][0] as any).analysis_hash;
 
         vi.clearAllMocks();
+        mockCapture.mockResolvedValue({
+            success: true,
+            screenshot: Buffer.from('fake-screenshot'),
+            contentType: 'image/png',
+            url: payload.competitorUrl,
+            title: 'Test Title',
+            timestamp: new Date().toISOString(),
+        });
+        mockAI.models.generateContent.mockResolvedValue({
+            text: JSON.stringify({
+                companyName: 'TestCo',
+                pricing: { plans: [{ name: 'Pro', price: '$10' }] },
+                features: { highlighted: ['F1'], differentiators: [] },
+                positioning: { socialProof: [] },
+                insights: [],
+                summary: 'Test summary'
+            })
+        });
         mockSupabase.limit.mockResolvedValue({
             data: [{ analysis_hash: hash }],
             error: null
@@ -151,8 +154,8 @@ describe('analyzeCompetitorTask', () => {
         expect(result2.hasChanged).toBe(false);
     });
 
-    it('handles Playwright failure gracefully', async () => {
-        mockPage.goto.mockRejectedValue(new Error('Page load failed'));
+    it('handles screenshot failure gracefully', async () => {
+        mockCapture.mockResolvedValue({ success: false, error: 'Page load failed', code: 'TIMEOUT' });
 
         const result = await (analyzeCompetitorTask as any).run(payload);
 
@@ -162,7 +165,7 @@ describe('analyzeCompetitorTask', () => {
 
     it('handles empty AI response text fallback', async () => {
         mockAI.models.generateContent.mockResolvedValue({
-            text: null // Should hit line 139 fallback to ""
+            text: null // fallback to ""
         });
 
         const result = await (analyzeCompetitorTask as any).run(payload);
@@ -171,7 +174,7 @@ describe('analyzeCompetitorTask', () => {
     });
 
     it('handles non-Error objects in catch block', async () => {
-        mockBrowser.newPage.mockRejectedValue('String Error'); // Hits line 196 "Unknown error"
+        mockCapture.mockRejectedValue('String Error');
 
         const result = await (analyzeCompetitorTask as any).run(payload);
         expect(result.success).toBe(false);

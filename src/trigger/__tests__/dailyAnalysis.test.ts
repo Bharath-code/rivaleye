@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted to ensure mocks are available for the dynamic imports and the task definition
-const { mockSupabase, mockAI, mockPage, mockBrowser } = vi.hoisted(() => {
+const { mockSupabase, mockAI, mockCapture } = vi.hoisted(() => {
     return {
         mockSupabase: {
             from: vi.fn().mockReturnThis(),
@@ -27,19 +27,7 @@ const { mockSupabase, mockAI, mockPage, mockBrowser } = vi.hoisted(() => {
                 }),
             },
         },
-        mockPage: {
-            setViewportSize: vi.fn().mockResolvedValue(undefined),
-            goto: vi.fn().mockResolvedValue(undefined),
-            waitForTimeout: vi.fn().mockResolvedValue(undefined),
-            evaluate: vi.fn().mockResolvedValue(undefined),
-            screenshot: vi.fn().mockResolvedValue(Buffer.from('fake-screenshot')),
-            title: vi.fn().mockResolvedValue('Test Title'),
-            close: vi.fn().mockResolvedValue(undefined),
-        },
-        mockBrowser: {
-            newPage: vi.fn(),
-            close: vi.fn().mockResolvedValue(undefined),
-        }
+        mockCapture: vi.fn(),
     };
 });
 
@@ -96,11 +84,8 @@ vi.mock('@google/genai', () => ({
     }),
 }));
 
-// Mock Playwright
-vi.mock('playwright', () => ({
-    chromium: {
-        launch: vi.fn().mockResolvedValue(mockBrowser),
-    },
+vi.mock('@/lib/crawler/screenshot', () => ({
+    captureScreenshot: mockCapture,
 }));
 
 import { dailyCompetitorAnalysis } from '../dailyAnalysis';
@@ -113,8 +98,14 @@ describe('dailyCompetitorAnalysis', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        mockBrowser.newPage.mockResolvedValue(mockPage);
-        mockPage.goto.mockResolvedValue(undefined);
+        mockCapture.mockResolvedValue({
+            success: true,
+            screenshot: Buffer.from('fake-screenshot'),
+            contentType: 'image/png',
+            url: 'https://c1.com',
+            title: 'Test Title',
+            timestamp: new Date().toISOString(),
+        });
 
         // Mock environment variables
         process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://fake.supabase.co';
@@ -127,7 +118,7 @@ describe('dailyCompetitorAnalysis', () => {
         if (result.errors > 0 || result.processed === 0) console.log('Daily Analysis Result:', result);
 
         expect(result.processed).toBe(2);
-        expect(mockBrowser.newPage).toHaveBeenCalledTimes(2);
+        expect(mockCapture).toHaveBeenCalledTimes(2);
     }, 30000);
 
     it('handles total failure gracefully', async () => {

@@ -16,7 +16,7 @@ npm run lint         # ESLint (max-warnings 200, non-blocking)
 
 - `src/app/api/**` — 27 route handlers. Tenant routes use `getUserId()` + `assertSameOrigin()` + `checkRateLimit()`.
 - `src/lib/diff/**` — deterministic pricing diff + alert rules. **AI never decides what's important; these rules do.** Severity weights in `pricingDiff.ts`, alert gating in `alertRules.ts`, noise filter in `isMeaningful.ts`.
-- `src/lib/crawler/**` — Firecrawl structured extractor (`scrapePage.ts`, real geo via `location.country`) for pricing + guardrails + screenshots (R2). Playwright survives only for techStack/performance/screenshot capture (P3b pending; see `docs/FIRECRAWL_CONSOLIDATION.md`).
+- `src/lib/crawler/**` — Firecrawl structured extractor (`scrapePage.ts`, real geo via `location.country`) for pricing + guardrails + screenshots (R2). Playwright is fully removed (P3b done 2026-07-11): screenshots + techStack detection ride Firecrawl; perf metrics come from Google PageSpeed Insights (`pageSpeedInsights.ts`). See `docs/FIRECRAWL_CONSOLIDATION.md`.
 - `src/lib/aeo/**` — AEO scan: queries N prompts × 5 models (ChatGPT/Perplexity/Claude/Gemini/Google AI), parses brand mentions, computes `visibility_pct`.
 - `src/lib/ai/**` — vision analyzer, insight/brief generator, embeddings.
 - `src/lib/billing/featureFlags.ts` — `PLAN_LIMITS` (free / pro / enterprise) is the single source of plan gating.
