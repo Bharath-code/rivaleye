@@ -1,21 +1,29 @@
 import { schedules, logger, metadata } from "@trigger.dev/sdk/v3";
 import { createClient } from "@supabase/supabase-js";
+import { createHash } from "crypto";
 import { checkPricingContext } from "./checkPricingContext";
 import { deepAuditTask } from "./deepAudit";
 import { crossRegionComparison } from "./crossRegionComparison";
+import { visionAnalysisContext } from "./visionAnalysisContext";
 import { getFeatureFlags } from "@/lib/billing/featureFlags";
 import type { PricingContext, Competitor } from "@/lib/types";
 
 /**
  * Daily Pricing Analysis Scheduler
  *
- * Geo-aware version of daily competitor analysis.
- * Loops through each competitor and their assigned pricing contexts.
- * 
+ * Geo-aware version of daily competitor analysis. Also the sole 6am cron
+ * entrypoint (P4 merge — folded in the former standalone dailyAnalysis.ts
+ * cron, which duplicated this task's competitor fetch at the same time of
+ * day). Loops through each competitor and their assigned pricing contexts.
+ *
  * Architecture:
  * - This task runs daily at 6 AM UTC
  * - For each competitor, it triggers checkPricingContext tasks for each context
- * - Implements frequency decay: reduce context checks after 30/90 days of no changes
+ * - Once per competitor, it also fires visionAnalysisContext (full-page vision
+ *   analysis — positioning/features/tagline, separate from pricing)
+ * - Implements frequency decay: reduce context checks after 30/90 days of no
+ *   changes, using a deterministic (date+id hashed) fraction instead of
+ *   Math.random() so the decision is reproducible and testable
  */
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -117,6 +125,7 @@ export const dailyPricingAnalysis = schedules.task({
             withAlerts: 0,
             errors: 0,
             crossRegionTriggered: 0,
+            visionTriggered: 0,
         };
 
         // Group work items by competitor for cross-region comparison
@@ -195,6 +204,18 @@ export const dailyPricingAnalysis = schedules.task({
                     } catch (error) {
                         logger.error("Failed to trigger deep audit", { competitor: work.competitorName, error });
                     }
+                }
+
+                try {
+                    await visionAnalysisContext.trigger({
+                        competitorId: work.competitorId,
+                        competitorUrl: work.competitorUrl,
+                        competitorName: work.competitorName,
+                        userId: work.userId,
+                    });
+                    results.visionTriggered++;
+                } catch (error) {
+                    logger.error("Failed to trigger vision analysis", { competitor: work.competitorName, error });
                 }
             }
 
@@ -299,10 +320,21 @@ async function buildWorkQueue(
 // FREQUENCY DECAY LOGIC
 // ══════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Deterministic stand-in for Math.random(): a stable fraction in [0, 1) derived
+ * from the seed. Same seed -> same result (reproducible, testable); varying the
+ * date component in the seed still rotates which competitors get skipped day to day.
+ */
+export function stableFraction(seed: string): number {
+    const hash = createHash("sha256").update(seed).digest();
+    return hash.readUInt32BE(0) / 0x100000000;
+}
+
 async function shouldCheckContext(
     supabase: ReturnType<typeof getSupabase>,
     competitorId: string,
-    contextId: string
+    contextId: string,
+    today = new Date().toISOString().slice(0, 10)
 ): Promise<boolean> {
     // Get last meaningful diff for this competitor + context
     const { data: lastDiffs } = await supabase
@@ -321,13 +353,14 @@ async function shouldCheckContext(
     const lastDiffDate = new Date((lastDiffs[0] as { created_at: string }).created_at);
     const daysSinceChange = (Date.now() - lastDiffDate.getTime()) / (1000 * 60 * 60 * 24);
 
-    // Frequency decay based on days since last change
+    // Frequency decay based on days since last change (deterministic per day)
+    const seed = `${competitorId}:${contextId}:${today}`;
     if (daysSinceChange > 90) {
         // After 90 days: check 25% of the time (weekly effectively)
-        return Math.random() < CONFIG.frequencyDecay.noChangeThreshold90Days;
+        return stableFraction(seed) < CONFIG.frequencyDecay.noChangeThreshold90Days;
     } else if (daysSinceChange > 30) {
         // After 30 days: check 50% of the time (every other day)
-        return Math.random() < CONFIG.frequencyDecay.noChangeThreshold30Days;
+        return stableFraction(seed) < CONFIG.frequencyDecay.noChangeThreshold30Days;
     }
 
     // Within 30 days: always check
