@@ -1,5 +1,5 @@
 import { createServerClient } from "@/lib/supabase";
-import { GoogleGenAI } from "@google/genai";
+import { generateText } from "@/lib/ai/aiProvider";
 import type { ExtractedBranding, BrandingColors } from "@/lib/crawler/brandingExtractor";
 
 /**
@@ -57,12 +57,7 @@ async function generateAIBrandingInsight(
     oldValue: string | null,
     newValue: string | null
 ): Promise<string | null> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return null;
-
     try {
-        const ai = new GoogleGenAI({ apiKey });
-
         const prompt = `You are a brand strategist analyzing a competitor's website.
 
 CHANGE DETECTED: ${changeType}
@@ -80,16 +75,14 @@ Examples:
 
 Return ONLY the strategic insight sentence, no quotes or formatting.`;
 
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            config: {
-                maxOutputTokens: 50,
-                temperature: 0.3,
-            },
+        const result = await generateText({
+            systemPrompt: "You are a brand strategist analyzing a competitor's website.",
+            userPrompt: prompt,
+            maxTokens: 50,
+            temperature: 0.3,
         });
 
-        const insight = response.text?.trim();
+        const insight = result.content.trim();
         return insight && insight.length > 10 ? insight : null;
     } catch (error) {
         console.error("[BrandingAlerts] AI generation failed:", error);

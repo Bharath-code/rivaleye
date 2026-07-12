@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { generateText } from "@/lib/ai/aiProvider";
 import type { PSIResult, PSILighthouseAudit } from "@/lib/crawler/pageSpeedInsights";
 
 /**
@@ -118,32 +118,19 @@ export async function generatePerformanceRecommendations(
     psiData: PSIResult,
     competitorName: string
 ): Promise<AIPerformanceAnalysis | null> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        console.error("[AI Recommendations] Missing GEMINI_API_KEY");
-        return null;
-    }
-
     try {
-        const ai = new GoogleGenAI({ apiKey });
         const prompt = buildPerformancePrompt(psiData, competitorName);
 
         console.log("[AI Recommendations] Starting analysis for", competitorName);
 
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            config: {
-                maxOutputTokens: 2000,
-                temperature: 0.3, // Lower temperature for more consistent output
-            },
+        const result = await generateText({
+            systemPrompt: "You are a web performance expert helping a SaaS founder understand their competitor's website performance.",
+            userPrompt: prompt,
+            maxTokens: 2000,
+            temperature: 0.3, // Lower temperature for more consistent output
         });
 
-        const rawText = typeof response.text === "string"
-            ? response.text
-            : typeof (response as any).response?.text === "function"
-                ? (response as any).response.text()
-                : "";
+        const rawText = result.content;
 
         // Parse JSON from response
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);

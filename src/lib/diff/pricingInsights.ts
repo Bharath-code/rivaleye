@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { generateText } from "@/lib/ai/aiProvider";
 import type { PricingSchema, PricingDiffType } from "@/lib/types";
 import type { DetectedDiff } from "./pricingDiff";
 
@@ -104,70 +104,31 @@ export async function generatePricingInsight(
     options?: {
         companyName?: string;
         region?: string;
-        beforeScreenshot?: Buffer;
-        afterScreenshot?: Buffer;
     }
 ): Promise<InsightResponse> {
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-        return {
-            success: false,
-            error: "GEMINI_API_KEY not configured",
-        };
-    }
+    // Build the prompt
+    const prompt = INSIGHT_PROMPT
+        .replace("{{CHANGE_DESCRIPTION}}", diff.description)
+        .replace("{{BEFORE_STATE}}", diff.before || "N/A")
+        .replace("{{AFTER_STATE}}", diff.after || "N/A")
+        .replace("{{CHANGE_TYPE}}", `${diff.type} - ${CHANGE_TYPE_CONTEXT[diff.type]}`)
+        .replace("{{COMPANY_NAME}}", options?.companyName || "Unknown")
+        .replace("{{REGION}}", options?.region || "Global");
 
     try {
-        const ai = new GoogleGenAI({ apiKey });
-
-        // Build the prompt
-        const prompt = INSIGHT_PROMPT
-            .replace("{{CHANGE_DESCRIPTION}}", diff.description)
-            .replace("{{BEFORE_STATE}}", diff.before || "N/A")
-            .replace("{{AFTER_STATE}}", diff.after || "N/A")
-            .replace("{{CHANGE_TYPE}}", `${diff.type} - ${CHANGE_TYPE_CONTEXT[diff.type]}`)
-            .replace("{{COMPANY_NAME}}", options?.companyName || "Unknown")
-            .replace("{{REGION}}", options?.region || "Global");
-
-        const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
-            { text: prompt },
-        ];
-
-        // Add screenshots if available (side-by-side context)
-        if (options?.beforeScreenshot && options?.afterScreenshot) {
-            parts.unshift(
-                { text: "BEFORE SCREENSHOT:" },
-                {
-                    inlineData: {
-                        mimeType: "image/jpeg",
-                        data: options.beforeScreenshot.toString("base64"),
-                    },
-                },
-                { text: "AFTER SCREENSHOT:" },
-                {
-                    inlineData: {
-                        mimeType: "image/jpeg",
-                        data: options.afterScreenshot.toString("base64"),
-                    },
-                }
-            );
-        }
-
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: [{ role: "user", parts }],
-            config: {
-                maxOutputTokens: 500,
-                temperature: 0.3,
-            },
+        const result = await generateText({
+            systemPrompt: "You are a Tier-1 Competitive Intelligence Architect.",
+            userPrompt: prompt,
+            maxTokens: 500,
+            temperature: 0.3,
         });
 
-        const rawText = response.text || "";
+        const rawText = result.content;
 
         if (!rawText) {
             return {
                 success: false,
-                error: "Gemini returned empty response",
+                error: "AI provider returned empty response",
             };
         }
 

@@ -20,21 +20,6 @@ import type { DetectedTech, TechCategory } from '@/lib/crawler/techStackDetector
 // MOCKS
 // ──────────────────────────────────────────────────────────────────────────────
 
-// Mock Gemini AI to avoid API calls
-vi.mock('@google/genai', () => ({
-    GoogleGenAI: class {
-        models = {
-            generateContent: vi.fn().mockResolvedValue({
-                text: JSON.stringify({
-                    addedMessage: 'Added test tech',
-                    removedMessage: 'Removed test tech',
-                    strategicImplication: 'Strategic move',
-                }),
-            }),
-        }
-    },
-}))
-
 // ──────────────────────────────────────────────────────────────────────────────
 // MOCK DATA FACTORIES
 // ──────────────────────────────────────────────────────────────────────────────

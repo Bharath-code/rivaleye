@@ -143,7 +143,18 @@ Each phase is independently shippable and guarded so it can land without a big-b
    "Track This Free" CTA into `/login`. Existing SSRF guard (`validateCompetitorUrl`) and
    the tenant-scoping guard are unaffected (route touches no tenant tables). Known gap:
    no bot challenge (Turnstile) in front of it yet — rate limit alone gates abuse for now.
-6. **P6 (optional) — AI Gateway unify** for Gemini/OpenAI/Anthropic.
+6. **P6 — DONE (2026-07-12).** Unified the Gemini generation-only call sites
+   (`pricingInsights.ts`, `techStackAlerts.ts`, `brandingAlerts.ts`,
+   `performanceRecommendations.ts`) onto `aiProvider.generateText()`, which now
+   routes through Vercel AI Gateway (`google/gemini-2.0-flash`, OpenAI-compatible
+   endpoint via the already-installed `openai` SDK) when `AI_GATEWAY_API_KEY` is
+   set, falling back to direct `@google/genai` → OpenRouter unchanged otherwise —
+   no new dependency, zero-downtime opt-in. Collapsed 4 duplicated
+   instantiate-parse-catch blocks into 1. `visionAnalyzer.ts` (image input) and
+   `aeo/providers.ts` (5-model AEO moat, Anthropic/Perplexity/etc. stay bespoke
+   per scope) were deliberately left untouched — different call shape / out of
+   scope. `pricingInsights.ts`'s unused before/after-screenshot vision branch
+   was dropped (dead code, zero callers passed it).
 
 ---
 

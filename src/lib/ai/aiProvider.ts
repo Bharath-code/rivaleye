@@ -1,12 +1,19 @@
 import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 
 /**
  * AI Provider Module
  *
  * Unified interface for AI generation with fallback:
- * 1. Gemini 3 Flash (primary - free tier)
- * 2. OpenRouter (fallback - free models)
+ * 1. Gemini via Vercel AI Gateway if AI_GATEWAY_API_KEY is set (one call
+ *    style + observability for P6 "unify" — falls back to direct Gemini
+ *    below if the gateway key isn't configured or the call fails)
+ * 2. Gemini 2.0 Flash direct (primary - free tier)
+ * 3. OpenRouter (fallback - free models)
  */
+
+const AI_GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh/v1";
+const GEMINI_GATEWAY_MODEL = "google/gemini-2.0-flash";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -29,7 +36,39 @@ export interface GenerateResult {
 // GEMINI PROVIDER
 // ══════════════════════════════════════════════════════════════════════════════
 
+async function generateWithGateway(options: GenerateOptions): Promise<GenerateResult | null> {
+    const gatewayKey = process.env.AI_GATEWAY_API_KEY;
+    if (!gatewayKey) return null;
+
+    try {
+        const client = new OpenAI({ apiKey: gatewayKey, baseURL: AI_GATEWAY_BASE_URL });
+        const completion = await client.chat.completions.create({
+            model: GEMINI_GATEWAY_MODEL,
+            messages: [
+                { role: "system", content: options.systemPrompt },
+                { role: "user", content: options.userPrompt },
+            ],
+            max_tokens: options.maxTokens || 500,
+            temperature: options.temperature ?? 0.3,
+        });
+
+        const content = completion.choices[0]?.message?.content || "";
+        if (!content) {
+            console.log("[AI] Gateway returned empty response");
+            return null;
+        }
+
+        return { content, provider: "gemini", model: GEMINI_GATEWAY_MODEL };
+    } catch (error) {
+        console.error("[AI] Gateway error:", error);
+        return null;
+    }
+}
+
 async function generateWithGemini(options: GenerateOptions): Promise<GenerateResult | null> {
+    const gatewayResult = await generateWithGateway(options);
+    if (gatewayResult) return gatewayResult;
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         console.log("[AI] Gemini API key not found, skipping...");
@@ -145,5 +184,5 @@ export async function generateText(options: GenerateOptions): Promise<GenerateRe
  * Check if any AI provider is available
  */
 export function isAIAvailable(): boolean {
-    return !!(process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY);
+    return !!(process.env.AI_GATEWAY_API_KEY || process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY);
 }

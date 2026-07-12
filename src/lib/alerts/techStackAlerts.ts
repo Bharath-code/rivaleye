@@ -1,5 +1,5 @@
 import { createServerClient } from "@/lib/supabase";
-import { GoogleGenAI } from "@google/genai";
+import { generateText } from "@/lib/ai/aiProvider";
 import type { DetectedTech, TechCategory } from "@/lib/crawler/techStackDetector";
 
 /**
@@ -190,12 +190,7 @@ async function generateAISemanticMeaning(
     category: TechCategory,
     added: boolean
 ): Promise<TechMeaning | null> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return null;
-
     try {
-        const ai = new GoogleGenAI({ apiKey });
-
         const prompt = `You are a competitive intelligence expert analyzing SaaS companies.
 
 CONTEXT: A competitor ${added ? "added" : "removed"} a technology called "${techName}" (category: ${category}).
@@ -213,24 +208,22 @@ Be specific and insightful. Examples:
 
 Return ONLY valid JSON, no markdown.`;
 
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            config: {
-                maxOutputTokens: 200,
-                temperature: 0.3,
-            },
+        const result = await generateText({
+            systemPrompt: "You are a competitive intelligence expert analyzing SaaS companies.",
+            userPrompt: prompt,
+            maxTokens: 200,
+            temperature: 0.3,
         });
 
-        const rawText = response.text || "";
+        const rawText = result.content;
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) return null;
 
-        const result = JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
         return {
-            addedMessage: result.addedMessage || `Added ${techName}`,
-            removedMessage: result.removedMessage || `Removed ${techName}`,
-            strategicImplication: result.strategicImplication || `Change in ${category} approach`,
+            addedMessage: parsed.addedMessage || `Added ${techName}`,
+            removedMessage: parsed.removedMessage || `Removed ${techName}`,
+            strategicImplication: parsed.strategicImplication || `Change in ${category} approach`,
         };
     } catch (error) {
         console.error("[TechStackAlerts] AI generation failed:", error);
