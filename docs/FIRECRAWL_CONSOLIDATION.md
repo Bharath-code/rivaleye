@@ -126,7 +126,15 @@ Each phase is independently shippable and guarded so it can land without a big-b
    Delete `geoContext`/`geoPlaywright`/`screenshot.ts`.
 3. **P3 — Delete the cascade + Playwright dep.** Remove Cheerio/Playwright tiers, `decideScraper`,
    `visionPricing`, and the Trigger build extension. Update the 6 importers.
-4. **P4 — Merge the two daily pipelines**; deterministic scheduling.
+4. **P4 — DONE (2026-07-12).** Merged the two daily pipelines. `dailyPricingAnalysis` is now the
+   sole 6am UTC cron entrypoint; it fires the extracted `visionAnalysisContext` child task once
+   per competitor (not per pricing-context, and not a second competitor fetch). `dailyAnalysis.ts`
+   was slimmed rather than deleted — `userSchedules.ts`/`/api/schedule` still attach PRO=6h /
+   ENTERPRISE=hourly custom cadences to its task id — it now just loops competitors and calls
+   `visionAnalysisContext.trigger()`, no duplicated business logic. `shouldCheckContext`'s
+   frequency-decay `Math.random()` replaced with `stableFraction()` — a sha256 hash of
+   `competitorId:contextId:date` mapped to [0,1), deterministic per day (testable) while still
+   rotating which competitors get skipped day to day.
 5. **P5 — Wow feature: instant teardown** (reuses `scrapePage.ts`).
 6. **P6 (optional) — AI Gateway unify** for Gemini/OpenAI/Anthropic.
 
