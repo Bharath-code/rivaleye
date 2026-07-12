@@ -95,7 +95,7 @@ These are correctness/logic issues found in the alerting math. None are catastro
 
 Current first-run is solid: landing promises "Setup in 30 seconds, no credit card," 3-step onboarding (Welcome → Add competitor → Confirm). Improvements:
 
-- [ ] **UX-1 Time-to-first-signal:** First crawl is fire-and-forget; the user lands on an empty dashboard. Show an **optimistic "we're scanning <name> now"** state with a skeleton + ETA, and push the first result via the existing realtime channel — don't make them refresh.
+- [x] **UX-1 Time-to-first-signal:** `CompetitorCard` already showed the optimistic "Running first scan…" state (now with an ETA) for a recently-added, never-checked competitor; added `useRealtimeCompetitors` (mirrors `useRealtimeAlerts`) so a Supabase Realtime `UPDATE` on `competitors` flips the card to its real result the moment the crawl finishes — no refresh needed.
 - [ ] **UX-2 Lead with a pre-filled example:** On step 2, offer 3 one-click sample competitors (e.g. Stripe, Notion, Linear) so a user reaches "first alert" without typing a URL. Reduces blank-page abandonment.
 - [ ] **UX-3 Activation = first *meaningful* brief, not first crawl.** Instrument and optimize for "user saw their first AI tactical brief," which is the actual aha.
 - [ ] **UX-4 Pricing clarity:** reconcile the price (see BIZ-1) and put the AEO scorecard above the fold — it's the differentiator.
