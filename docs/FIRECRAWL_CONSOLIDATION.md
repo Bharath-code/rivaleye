@@ -135,7 +135,14 @@ Each phase is independently shippable and guarded so it can land without a big-b
    frequency-decay `Math.random()` replaced with `stableFraction()` — a sha256 hash of
    `competitorId:contextId:date` mapped to [0,1), deterministic per day (testable) while still
    rotating which competitors get skipped day to day.
-5. **P5 — Wow feature: instant teardown** (reuses `scrapePage.ts`).
+5. **P5 — DONE (2026-07-12).** Instant teardown shipped. `POST /api/public/teardown`
+   (unauthenticated, per-IP rate-limited via `RATE_LIMITS.teardown`, 5/10min) reuses
+   `scrapePricing()` synchronously with `captureScreenshot=true` — one Firecrawl call
+   returns pricing plans + a hosted screenshot URL, no DB write, no R2 upload (ephemeral
+   pre-signup preview). Landing page (`InstantTeardown.tsx`) renders it inline with a
+   "Track This Free" CTA into `/login`. Existing SSRF guard (`validateCompetitorUrl`) and
+   the tenant-scoping guard are unaffected (route touches no tenant tables). Known gap:
+   no bot challenge (Turnstile) in front of it yet — rate limit alone gates abuse for now.
 6. **P6 (optional) — AI Gateway unify** for Gemini/OpenAI/Anthropic.
 
 ---

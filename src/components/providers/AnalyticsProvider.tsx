@@ -17,6 +17,13 @@ export const analytics = {
         posthog.capture('signup_started'),
     signupCompleted: (method: 'email' | 'google' | 'github') =>
         posthog.capture('signup_completed', { method }),
+    // P5: pre-signup instant teardown — the activation "holy-sh*t" moment
+    teardownSubmitted: () =>
+        posthog.capture('teardown_submitted'),
+    teardownSucceeded: () =>
+        posthog.capture('teardown_succeeded'),
+    teardownFailed: (reason: string) =>
+        posthog.capture('teardown_failed', { reason }),
 
     // Activation
     onboardingCompetitorAdded: () =>

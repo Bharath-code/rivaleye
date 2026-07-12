@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DemoAlertPreview } from "@/components/demo";
 import { HeroCTA, DemoCTA, PricingFreeCTA, PricingProCTA, FooterCTA } from "@/components/marketing/TrackedCTA";
 import { BillingToggle } from "@/components/marketing/BillingToggle";
+import { InstantTeardown } from "@/components/marketing/InstantTeardown";
 import Link from "next/link";
 import {
   Eye,
@@ -133,6 +134,11 @@ export default function Home() {
             Free forever for 1 competitor • Setup in 30 seconds • No credit card
           </p>
         </div>
+      </section>
+
+      {/* Instant Teardown — pre-signup activation moment (P5) */}
+      <section className="px-6 pb-20">
+        <InstantTeardown />
       </section>
 
       {/* Social Proof Bar */}

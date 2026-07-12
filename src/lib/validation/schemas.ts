@@ -53,6 +53,11 @@ export const analyzeCompetitorSchema = z.object({
 });
 export type AnalyzeCompetitorInput = z.infer<typeof analyzeCompetitorSchema>;
 
+export const teardownSchema = z.object({
+    url: z.string().url().max(2048),
+});
+export type TeardownInput = z.infer<typeof teardownSchema>;
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Alerts
 // ══════════════════════════════════════════════════════════════════════════════

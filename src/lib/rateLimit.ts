@@ -195,6 +195,9 @@ export const RATE_LIMITS = {
 
     /** Auth endpoints: 10 per minute per IP */
     auth: { maxRequests: 10, windowMs: 60 * 1000 } as RateLimitConfig,
+
+    /** Pre-signup instant teardown (P5): 5 per 10 min per IP — costs a Firecrawl credit, no auth to gate abuse */
+    teardown: { maxRequests: 5, windowMs: 10 * 60 * 1000 } as RateLimitConfig,
 } as const;
 
 /**
