@@ -198,6 +198,9 @@ export const RATE_LIMITS = {
 
     /** Pre-signup instant teardown (P5): 5 per 10 min per IP — costs a Firecrawl credit, no auth to gate abuse */
     teardown: { maxRequests: 5, windowMs: 10 * 60 * 1000 } as RateLimitConfig,
+
+    /** Free public AEO checker: 3 per 24h per IP — each uncached call costs up to 6 LLM queries */
+    aeoCheck: { maxRequests: 3, windowMs: 24 * 60 * 60 * 1000 } as RateLimitConfig,
 } as const;
 
 /**

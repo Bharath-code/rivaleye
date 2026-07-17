@@ -40,6 +40,10 @@ const ALLOWLIST: Record<string, string> = {
     "auth/refresh/route.ts": "token refresh — no tenant table query",
     "auth/logout/route.ts": "logout — no tenant table query",
     "monitoring/route.ts": "health/monitoring endpoint",
+    // public/aeo-check: intentionally unauthenticated growth endpoint — no tenant
+    // data touched; reads/writes only the anonymous public_aeo_checks cache,
+    // gated by per-IP rate limit + 24h cache + 6-call hard cap.
+    "public/aeo-check/route.ts": "intentionally unauthenticated growth endpoint — no tenant data touched; reads/writes only the anonymous public_aeo_checks cache, gated by per-IP rate limit + 24h cache + 6-call hard cap",
 };
 
 function walk(dir: string): string[] {

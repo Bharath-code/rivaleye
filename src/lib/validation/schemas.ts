@@ -58,6 +58,12 @@ export const teardownSchema = z.object({
 });
 export type TeardownInput = z.infer<typeof teardownSchema>;
 
+export const aeoCheckSchema = z.object({
+    brand: z.string().trim().min(2).max(100),
+    url: z.string().url().max(2048),
+});
+export type AeoCheckInput = z.infer<typeof aeoCheckSchema>;
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Alerts
 // ══════════════════════════════════════════════════════════════════════════════
