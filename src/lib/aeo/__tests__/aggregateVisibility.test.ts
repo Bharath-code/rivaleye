@@ -56,3 +56,42 @@ describe("aggregateVisibility", () => {
         expect(agg.competitors.map((c) => c.id)).toEqual(["a", "b", "c"]);
     });
 });
+
+describe("own share blending", () => {
+    const summary = (
+        total: number,
+        mentions: number,
+        own: { total: number; mentions: number; visibility_pct: number } | null
+    ) => ({
+        total,
+        mentions,
+        visibility_pct: total ? (mentions / total) * 100 : 0,
+        avg_position: null,
+        by_model: [],
+        own,
+    });
+
+    it("is null when no summary has own data", () => {
+        const out = aggregateVisibility([
+            { id: "a", name: "A", summary: summary(5, 2, null) },
+        ]);
+        expect(out.own).toBeNull();
+    });
+
+    it("blends own share from raw counts, weighting by query volume", () => {
+        const out = aggregateVisibility([
+            {
+                id: "a",
+                name: "A",
+                summary: summary(10, 5, { total: 10, mentions: 1, visibility_pct: 10 }),
+            },
+            {
+                id: "b",
+                name: "B",
+                summary: summary(2, 2, { total: 2, mentions: 2, visibility_pct: 100 }),
+            },
+        ]);
+        // raw blend: 3/12 = 25%, NOT avg(10,100)=55%
+        expect(out.own).toEqual({ total: 12, mentions: 3, visibility_pct: 25 });
+    });
+});

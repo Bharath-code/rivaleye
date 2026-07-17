@@ -45,6 +45,13 @@ export async function GET(request: NextRequest) {
         const { windowDays } = parsed.data;
 
         const supabase = createServerClient();
+        const { data: userRow } = await supabase
+            .from("users")
+            .select("settings")
+            .eq("id", userId)
+            .single();
+        const brandSet = Boolean(userRow?.settings?.brand_name);
+
         const { data: competitors, error } = await supabase
             .from("competitors")
             .select("id, name, aeo_enabled")
@@ -68,6 +75,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(
             {
                 window_days: windowDays,
+                brand_set: brandSet,
                 ...aggregateVisibility(summaries),
             },
             { headers: reqHeaders }

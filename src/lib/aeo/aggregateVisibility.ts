@@ -22,6 +22,9 @@ export interface AggregateVisibility {
     tracked: number;
     /** Per-competitor rows, sorted by visibility desc then name. */
     competitors: CompetitorVisibility[];
+    /** Blended own-brand share across all scanned competitors; null when the
+     *  user has no brand configured / no own-brand data in the window. */
+    own: { total: number; mentions: number; visibility_pct: number } | null;
 }
 
 function round1(n: number): number {
@@ -41,6 +44,8 @@ export function aggregateVisibility(
     let total = 0;
     let mentions = 0;
     let scanned = 0;
+    let ownTotal = 0;
+    let ownMentions = 0;
 
     const competitors: CompetitorVisibility[] = rows.map(({ id, name, summary }) => {
         const t = summary?.total ?? 0;
@@ -48,6 +53,10 @@ export function aggregateVisibility(
         total += t;
         mentions += m;
         if (t > 0) scanned += 1;
+        if (summary?.own) {
+            ownTotal += summary.own.total;
+            ownMentions += summary.own.mentions;
+        }
         return {
             id,
             name,
@@ -70,5 +79,13 @@ export function aggregateVisibility(
         scanned,
         tracked: rows.length,
         competitors,
+        own:
+            ownTotal > 0
+                ? {
+                      total: ownTotal,
+                      mentions: ownMentions,
+                      visibility_pct: round1((ownMentions / ownTotal) * 100),
+                  }
+                : null,
     };
 }
