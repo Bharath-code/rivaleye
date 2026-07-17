@@ -16,3 +16,13 @@ CREATE TABLE IF NOT EXISTS public_aeo_checks (
 
 CREATE INDEX IF NOT EXISTS idx_public_aeo_checks_key
     ON public_aeo_checks(cache_key, created_at DESC);
+
+-- RLS with zero policies: blocks anon/authenticated roles from reading or
+-- writing this table directly via PostgREST (no legitimate direct-client
+-- access path exists — it's an internal cache for /api/public/aeo-check).
+-- Without this, the default PostgREST grants would let anyone with the
+-- public anon key read all cached brand/URL pairs or insert fabricated
+-- `result` JSON to poison the cache, bypassing the route's rate limit
+-- entirely. `createServerClient()` uses the service-role key, which
+-- bypasses RLS as usual, so app code is unaffected.
+ALTER TABLE public_aeo_checks ENABLE ROW LEVEL SECURITY;

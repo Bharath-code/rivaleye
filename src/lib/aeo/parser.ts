@@ -187,7 +187,7 @@ export function isBrandMentioned(
         return {
             mentioned: true,
             position: null, // Citation but no prose mention
-            excerpt: `Cited as ${citation}`,
+            excerpt: `Cited as ${citation}`.slice(0, 300),
         };
     }
 

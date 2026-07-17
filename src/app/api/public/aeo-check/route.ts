@@ -20,6 +20,12 @@ const CHECK_QUERY_COUNT = 3;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
+    // ponytail: per-IP rate limiting keyed off x-forwarded-for is spoofable by
+    // any client that controls its own request headers (or sits behind a proxy
+    // that doesn't overwrite them) — same known, accepted limitation as
+    // /api/public/teardown, and covered by the project's tracked SEC-5
+    // (in-memory rate limiter, best-effort until moved to Redis/Upstash). Not a
+    // new gap introduced here; not fixing it in this route either.
     const ip =
         request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
         request.headers.get("x-real-ip") ||
