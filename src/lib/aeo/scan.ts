@@ -3,6 +3,7 @@ import { queryModel, type ModelName, type AEOResponse } from "./providers";
 import { isBrandMentioned } from "./parser";
 import { generateDefaultQueries, type CompetitorInput } from "./queries";
 import { logger } from "@/lib/logger";
+import { computeOwnShare, type OwnShare } from "./ownShare";
 
 /**
  * AEO Orchestrator
@@ -30,6 +31,8 @@ export interface ScanResult {
     cost_usd: number;
     duration_ms: number;
     errors: string[];
+    own_mentions: number | null;
+    own_visibility_pct: number | null;
 }
 
 /**
@@ -66,6 +69,16 @@ export async function runAEOScan(
     if (!competitor.aeo_enabled) {
         throw new Error("AEO monitoring is disabled for this competitor");
     }
+
+    // 1b. Load the user's own brand (for own-share capture — zero extra LLM cost,
+    // reuses the same model responses fetched for competitor mentions below).
+    const { data: userRow } = await supabase
+        .from("users")
+        .select("settings")
+        .eq("id", userId)
+        .single();
+    const brandName: string | null = userRow?.settings?.brand_name ?? null;
+    const brandUrl: string | null = userRow?.settings?.brand_url ?? null;
 
     // 2. Determine queries (capped — PERF-3: a custom 20-query set × 5 models
     // would otherwise be 100 paid calls fired at once).
@@ -161,9 +174,12 @@ export async function runAEOScan(
         cost_usd: number;
         scanned_at: string;
         latency_ms: number;
+        own_mentioned: boolean | null;
+        own_position: number | null;
     }> = [];
 
     let totalMentions = 0;
+    let ownMentions = 0;
     let totalCost = 0;
     const errors: string[] = [];
 
@@ -184,6 +200,16 @@ export async function runAEOScan(
         if (check.mentioned) totalMentions++;
         totalCost += r.cost_usd;
 
+        const own = brandName
+            ? isBrandMentioned(
+                  r.response_text,
+                  r.citations,
+                  brandName,
+                  brandUrl ?? undefined
+              )
+            : null;
+        if (own?.mentioned) ownMentions++;
+
         rows.push({
             user_id: userId,
             competitor_id: competitorId,
@@ -196,6 +222,8 @@ export async function runAEOScan(
             cost_usd: r.cost_usd,
             scanned_at: new Date().toISOString(),
             latency_ms: r.latency_ms,
+            own_mentioned: own ? own.mentioned : null,
+            own_position: own?.position ?? null,
         });
     }
 
@@ -252,6 +280,11 @@ export async function runAEOScan(
         cost_usd: Math.round(totalCost * 10000) / 10000,
         duration_ms: duration,
         errors,
+        own_mentions: brandName ? ownMentions : null,
+        own_visibility_pct:
+            brandName && rows.length > 0
+                ? Math.round((ownMentions / rows.length) * 1000) / 10
+                : null,
     };
 }
 
@@ -270,6 +303,7 @@ export interface VisibilitySummary {
         visibility_pct: number;
         avg_position: number | null;
     }>;
+    own: OwnShare | null;
 }
 
 export async function getVisibilitySummary(
@@ -306,6 +340,19 @@ export async function getVisibilitySummary(
         logger.error({ err: modelError }, "AEO by-model RPC failed");
     }
 
+    // RPCs don't know about the new own_mentioned column — query it directly.
+    // idx_aeo_user_competitor_time covers this lookup.
+    const { data: ownRows, error: ownError } = await supabase
+        .from("aeo_visibility")
+        .select("own_mentioned")
+        .eq("user_id", userId)
+        .eq("competitor_id", competitorId)
+        .gte("scanned_at", since);
+
+    if (ownError) {
+        logger.error({ err: ownError }, "AEO own-share query failed");
+    }
+
     const o = overall?.[0] || {
         total_queries: 0,
         mentions: 0,
@@ -325,5 +372,6 @@ export async function getVisibilitySummary(
             visibility_pct: Number(row.visibility_pct),
             avg_position: row.avg_position ? Number(row.avg_position) : null,
         })),
+        own: computeOwnShare(ownRows ?? []),
     };
 }

@@ -9,6 +9,7 @@ function summary(total: number, mentions: number): VisibilitySummary {
         visibility_pct: total > 0 ? Math.round((mentions / total) * 1000) / 10 : 0,
         avg_position: null,
         by_model: [],
+        own: null,
     };
 }
 
