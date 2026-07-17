@@ -7,6 +7,7 @@ import { DemoAlertPreview } from "@/components/demo";
 import { HeroCTA, DemoCTA, PricingFreeCTA, PricingProCTA, FooterCTA } from "@/components/marketing/TrackedCTA";
 import { BillingToggle } from "@/components/marketing/BillingToggle";
 import { InstantTeardown } from "@/components/marketing/InstantTeardown";
+import { AIVisibilityChecker } from "@/components/marketing/AIVisibilityChecker";
 import Link from "next/link";
 import {
   Eye,
@@ -180,6 +181,13 @@ export default function Home() {
               )}
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* AI Visibility Checker — free pre-signup wedge activation (AEO share-of-voice) */}
+      <section className="px-6 pb-20">
+        <div className="max-w-2xl mx-auto gsap-reveal">
+          <AIVisibilityChecker />
         </div>
       </section>
 
