@@ -18,7 +18,7 @@ import type { AggregateVisibility } from "@/lib/aeo/aggregateVisibility";
  * initial render (competitors/alerts load independently).
  */
 
-type Summary = AggregateVisibility & { window_days: number };
+type Summary = AggregateVisibility & { window_days: number; brand_set: boolean };
 
 export function DashboardAEOSummary() {
     const [data, setData] = useState<Summary | null>(null);
@@ -125,14 +125,36 @@ function Populated({ data }: { data: Summary }) {
     const scanned = data.competitors.filter((c) => c.scanned);
     return (
         <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 items-center">
-            <div className="md:pr-6 md:border-r border-white/5">
-                <div className="text-4xl font-display font-bold text-foreground leading-none">
-                    {data.visibility_pct.toFixed(0)}%
+            <div className="md:pr-6 md:border-r border-white/5 space-y-3">
+                {data.own ? (
+                    <div>
+                        <div className="text-4xl font-display font-bold text-emerald-400 leading-none">
+                            {data.own.visibility_pct.toFixed(0)}%
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                            your share of AI answers
+                        </p>
+                    </div>
+                ) : !data.brand_set ? (
+                    <Link
+                        href="/dashboard/settings"
+                        className="block text-xs text-emerald-400 hover:underline max-w-[180px] leading-relaxed"
+                    >
+                        Add your brand to see your share of AI answers →
+                    </Link>
+                ) : (
+                    <p className="text-[11px] text-muted-foreground max-w-[180px] leading-relaxed">
+                        Your share appears after the next scan.
+                    </p>
+                )}
+                <div>
+                    <div className="text-2xl font-display font-bold text-foreground leading-none">
+                        {data.visibility_pct.toFixed(0)}%
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed max-w-[180px]">
+                        competitors&apos; blended visibility ({scanned.length} scanned)
+                    </p>
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed max-w-[180px]">
-                    blended visibility across {scanned.length} scanned competitor
-                    {scanned.length === 1 ? "" : "s"}
-                </p>
             </div>
 
             <div className="space-y-2 min-w-0">

@@ -24,6 +24,8 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
     const [step, setStep] = useState(1);
     const [url, setUrl] = useState("");
     const [name, setName] = useState("");
+    const [brandName, setBrandName] = useState("");
+    const [brandUrl, setBrandUrl] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +50,17 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
 
         setIsSubmitting(true);
         setError(null);
+
+        if (brandName.trim()) {
+            fetch("/api/settings", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    brand_name: brandName.trim(),
+                    ...(brandUrl.trim() ? { brand_url: brandUrl.trim() } : {}),
+                }),
+            }).catch(() => {}); // ponytail: best-effort; settings page is the fallback
+        }
 
         try {
             await onComplete(url, name || new URL(url).hostname);
@@ -155,6 +168,26 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                                         placeholder="Acme Corp"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="pt-2 border-t border-white/5 space-y-2">
+                                    <Label htmlFor="brand-name">
+                                        Your product (optional — unlocks &quot;your share of AI answers&quot;)
+                                    </Label>
+                                    <Input
+                                        id="brand-name"
+                                        type="text"
+                                        placeholder="Your product name"
+                                        value={brandName}
+                                        onChange={(e) => setBrandName(e.target.value)}
+                                    />
+                                    <Input
+                                        id="brand-url"
+                                        type="url"
+                                        placeholder="https://yourproduct.com"
+                                        value={brandUrl}
+                                        onChange={(e) => setBrandUrl(e.target.value)}
                                     />
                                 </div>
                             </div>
