@@ -98,12 +98,20 @@ export const updateSettingsSchema = z
                 z.null(),
             ])
             .optional(),
+        brand_name: z
+            .union([z.literal(""), z.string().trim().min(2).max(100), z.null()])
+            .optional(),
+        brand_url: z
+            .union([z.literal(""), z.string().url().max(2048), z.null()])
+            .optional(),
     })
     .refine(
         (data) =>
             data.email_enabled !== undefined ||
             data.digest_frequency !== undefined ||
-            data.slack_webhook_url !== undefined,
+            data.slack_webhook_url !== undefined ||
+            data.brand_name !== undefined ||
+            data.brand_url !== undefined,
         { message: "At least one field must be provided" }
     );
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;

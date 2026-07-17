@@ -6,12 +6,16 @@ export interface UserSettings {
     email_enabled: boolean;
     digest_frequency: "instant" | "daily" | "weekly";
     slack_webhook_url: string | null;
+    brand_name: string | null;
+    brand_url: string | null;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
     email_enabled: true,
     digest_frequency: "instant",
     slack_webhook_url: null,
+    brand_name: null,
+    brand_url: null,
 };
 
 export interface User {

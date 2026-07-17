@@ -105,6 +105,14 @@ export async function PATCH(request: NextRequest) {
                 updates.slack_webhook_url = encrypted;
             }
         }
+        if (parsed.data.brand_name !== undefined) {
+            updates.brand_name =
+                parsed.data.brand_name === "" ? null : parsed.data.brand_name;
+        }
+        if (parsed.data.brand_url !== undefined) {
+            updates.brand_url =
+                parsed.data.brand_url === "" ? null : parsed.data.brand_url;
+        }
 
         if (Object.keys(updates).length === 0) {
             return NextResponse.json(
