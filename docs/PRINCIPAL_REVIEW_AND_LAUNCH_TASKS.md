@@ -96,9 +96,9 @@ These are correctness/logic issues found in the alerting math. None are catastro
 Current first-run is solid: landing promises "Setup in 30 seconds, no credit card," 3-step onboarding (Welcome → Add competitor → Confirm). Improvements:
 
 - [x] **UX-1 Time-to-first-signal:** `CompetitorCard` already showed the optimistic "Running first scan…" state (now with an ETA) for a recently-added, never-checked competitor; added `useRealtimeCompetitors` (mirrors `useRealtimeAlerts`) so a Supabase Realtime `UPDATE` on `competitors` flips the card to its real result the moment the crawl finishes — no refresh needed.
-- [ ] **UX-2 Lead with a pre-filled example:** On step 2, offer 3 one-click sample competitors (e.g. Stripe, Notion, Linear) so a user reaches "first alert" without typing a URL. Reduces blank-page abandonment.
-- [ ] **UX-3 Activation = first *meaningful* brief, not first crawl.** Instrument and optimize for "user saw their first AI tactical brief," which is the actual aha.
-- [ ] **UX-4 Pricing clarity:** reconcile the price (see BIZ-1) and put the AEO scorecard above the fold — it's the differentiator.
+- [x] **UX-2 Lead with a pre-filled example:** `OnboardingWizard.tsx` step 2 offers one-click Stripe/Notion/Linear/Figma chips so a user reaches "first alert" without typing a URL.
+- [x] **UX-3 Activation = first *meaningful* brief, not first crawl.** `brief_viewed` + `first_brief_viewed` analytics events fire from `CompetitiveResponseBrief`, tracking the actual aha moment instead of first crawl.
+- [x] **UX-4 Pricing clarity:** price is single-sourced (see BIZ-1); AEO scorecard section moved above the fold on the landing page — now renders right after the hero, before Instant Teardown (`src/app/page.tsx`).
 
 ---
 
