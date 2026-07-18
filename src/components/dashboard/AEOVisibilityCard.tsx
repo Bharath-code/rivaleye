@@ -286,8 +286,39 @@ export function AEOVisibilityCard({ competitor }: { competitor: AEOCompetitorInp
                         </Badge>
                     </div>
                 )}
+
+                <TopCitations competitorId={competitor.id} />
             </CardContent>
         </Card>
+    );
+}
+
+function TopCitations({ competitorId }: { competitorId: string }) {
+    const [domains, setDomains] = useState<Array<{ domain: string; count: number }>>([]);
+
+    useEffect(() => {
+        fetch(`/api/aeo/citations?competitorId=${competitorId}&windowDays=30`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => setDomains(d?.domains?.slice(0, 5) ?? []))
+            .catch(() => {}); // supplementary — fail quietly like the rest of AEO UI
+    }, [competitorId]);
+
+    if (domains.length === 0) return null;
+
+    return (
+        <div className="mt-4 pt-4 border-t border-white/5">
+            <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">
+                Sources AI cites
+            </p>
+            <ul className="space-y-1">
+                {domains.map((d) => (
+                    <li key={d.domain} className="flex items-center justify-between text-xs">
+                        <span className="text-foreground truncate">{d.domain}</span>
+                        <span className="font-mono text-muted-foreground">{d.count}×</span>
+                    </li>
+                ))}
+            </ul>
+        </div>
     );
 }
 
