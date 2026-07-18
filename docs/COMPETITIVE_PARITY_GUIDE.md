@@ -32,8 +32,8 @@ RivalEye straddles three categories — its differentiation, but also parity pre
 ## 3. Parity completion tasks (ordered by revenue-defensible gap, not feature-matching)
 
 ### P0 — AEO share-of-voice (closes gap with Peec/Otterly; our wedge)
-- [ ] **PAR-1** Capture user's own brand at onboarding; include in AEO scans so `visibility_pct` = "your share vs each competitor". Touches `src/lib/aeo/` brand parsing (already extracts mentions — extend brand list), `/api/aeo/summary`, `DashboardAEOSummary`. Mostly wiring. (Ref memory: `aeo-your-share-not-built`.)
-- [ ] **PAR-2** Citation/source tracking: store + rank URLs cited in model answers (Profound's core pitch). Raw responses already exist in the scan pipeline.
+- [x] **PAR-1** Capture user's own brand at onboarding; include in AEO scans so `visibility_pct` = "your share vs each competitor". (shipped 2026-07-17 — see docs/superpowers/plans/2026-07-17-aeo-share-of-voice.md)
+- [x] **PAR-2** Citation/source tracking: store + rank URLs cited in model answers (Profound's core pitch). (shipped 2026-07-17 — see docs/superpowers/plans/2026-07-17-aeo-share-of-voice.md)
 
 ### P1 — Alert delivery parity (cheap, churn-prevention)
 - [ ] **PAR-3** Generic outbound webhook per user (HMAC-signed). One table column + one POST; gets Zapier/Make compatibility free. Have email + Slack today (`src/lib/alerts/slackIntegration.ts`).

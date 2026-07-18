@@ -31,6 +31,7 @@ The engineering is genuinely strong for a solo/early product: typed end-to-end (
 | UX-2 | ✅ Already present | Onboarding step 2 already offers one-click Stripe/Notion/Linear/Figma chips. |
 | UX-3 | ✅ Done | `brief_viewed` + `first_brief_viewed` analytics events fired from `CompetitiveResponseBrief` (activation milestone). |
 | PERF-2 | ✅ Done (code) | Lenis smooth-scroll gated behind `prefers-reduced-motion`; ticker-removal leak fixed; `canvas-confetti` now dynamically imported + reduced-motion aware. **Lighthouse run still pending** (needs deployed/served app). |
+| PAR-1/PAR-2 | ✅ Done (2026-07-17) | Own-brand share-of-voice in scans/summary/dashboard, onboarding brand capture, free public AI-visibility checker (`/api/public/aeo-check`, 3/IP/day + 24h cache), citation-source ranking. Operator: apply `supabase/migrations/20260717_own_brand_sov.sql` in Supabase. |
 
 Verification after all of the above: **586 tests pass** (was 557), production typecheck clean, `npm run build` succeeds (exit 0).
 
