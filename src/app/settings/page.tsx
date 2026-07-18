@@ -20,7 +20,8 @@ import {
     CheckCircle2,
     AlertCircle,
     Slack,
-    Mail
+    Mail,
+    Sparkles
 } from "lucide-react";
 import Link from "next/link";
 import type { UserSettings } from "@/lib/types";
@@ -33,6 +34,9 @@ export default function SettingsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
     const [error, setError] = useState<string | null>(null);
+
+    const [brandName, setBrandName] = useState("");
+    const [originalBrandName, setOriginalBrandName] = useState("");
 
     // Slack webhook state
     const [slackUrl, setSlackUrl] = useState("");
@@ -59,6 +63,9 @@ export default function SettingsPage() {
             const webhookValue = data.settings.slack_webhook_url || "";
             setSlackUrl(webhookValue);
             setOriginalSlackUrl(webhookValue);
+            const brandValue = data.settings.brand_name || "";
+            setBrandName(brandValue);
+            setOriginalBrandName(brandValue);
 
             // Fetch plan info
             try {
@@ -295,6 +302,48 @@ export default function SettingsPage() {
                                         </Link>
                                     )}
                                 </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Your Brand (AEO own-share) */}
+                        <Card className="glass-card">
+                            <CardHeader>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                                        <Sparkles className="w-5 h-5 text-emerald-400" />
+                                    </div>
+                                    <div>
+                                        <CardTitle className="text-lg">Your Brand</CardTitle>
+                                        <CardDescription>
+                                            Used to measure your own share of AI answers alongside competitors
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="brand-name">Brand name</Label>
+                                    <Input
+                                        id="brand-name"
+                                        placeholder="e.g. RivalEye"
+                                        value={brandName}
+                                        maxLength={100}
+                                        onChange={(e) => setBrandName(e.target.value)}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        We check every AI answer for this name. Your share appears on the dashboard after the next scan.
+                                    </p>
+                                </div>
+                                <Button
+                                    onClick={async () => {
+                                        await updateSettings({ brand_name: brandName.trim() || null });
+                                        setOriginalBrandName(brandName.trim());
+                                    }}
+                                    disabled={isSaving || brandName.trim() === originalBrandName}
+                                    className="glow-emerald"
+                                >
+                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                                </Button>
                             </CardContent>
                         </Card>
 

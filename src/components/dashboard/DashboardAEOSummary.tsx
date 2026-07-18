@@ -137,7 +137,7 @@ function Populated({ data }: { data: Summary }) {
                     </div>
                 ) : !data.brand_set ? (
                     <Link
-                        href="/dashboard/settings"
+                        href="/settings"
                         className="block text-xs text-emerald-400 hover:underline max-w-[180px] leading-relaxed"
                     >
                         Add your brand to see your share of AI answers →
